@@ -16,17 +16,18 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-PACKAGE = ROOT / "src" / "filetimecluster"
+PACKAGE = ROOT / "src" / "filenamecluster"
 ANALYSIS = ROOT / "pyinstaller"
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Freeze the app into ``dist/`` for this machine.
+    """Freeze one program file into ``dist/`` for this machine.
 
+    Windows writes ``dist/filenamecluster.exe``, Linux writes
+    ``dist/filenamecluster``, and Mac writes ``dist/filenamecluster.app``.
     PyInstaller's spec file and analysis folder are removed after a successful
-    build. On a Mac the onedir copy beside ``filetimecluster.app`` is removed
-    too; on Linux and Windows that folder is the program, so it stays.
-    Pass ``--no-cleanup`` to keep everything for inspection.
+    build. On a Mac an extra folder beside the app is removed too.
+    Pass ``--no-cleanup`` to keep the analysis files.
     """
 
     args = list(sys.argv[1:] if argv is None else argv)
@@ -50,8 +51,9 @@ def main(argv: list[str] | None = None) -> int:
         "--noconfirm",
         "--clean",
         "--windowed",
+        "--onefile",
         "--name",
-        "filetimecluster",
+        "filenamecluster",
         "--specpath",
         str(ANALYSIS),
         "--workpath",
@@ -74,9 +76,10 @@ def main(argv: list[str] | None = None) -> int:
     shutil.rmtree(ANALYSIS, ignore_errors=True)
     print("Removed PyInstaller analysis files from pyinstaller/.")
     dist = ROOT / "dist"
-    if (dist / "filetimecluster.app").is_dir():
-        shutil.rmtree(dist / "filetimecluster", ignore_errors=True)
-        print("Removed dist/filetimecluster; the Mac app is dist/filetimecluster.app.")
+    extra = dist / "filenamecluster"
+    if (dist / "filenamecluster.app").is_dir() and extra.exists():
+        shutil.rmtree(extra)
+        print("Removed dist/filenamecluster; the Mac app is dist/filenamecluster.app.")
     return 0
 
 
@@ -84,12 +87,12 @@ def _bundled_files() -> list[tuple[Path, str]]:
     """JSON catalogs and the window icon, placed beside their modules."""
 
     files = [
-        (path, "filetimecluster/ui/i18n")
+        (path, "filenamecluster/ui/i18n")
         for path in sorted((PACKAGE / "ui" / "i18n").glob("*.json"))
     ]
     icon = PACKAGE / "ui" / "assets" / "icon.png"
     if icon.is_file():
-        files.append((icon, "filetimecluster/ui/assets"))
+        files.append((icon, "filenamecluster/ui/assets"))
     return files
 
 

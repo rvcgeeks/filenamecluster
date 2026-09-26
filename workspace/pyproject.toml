@@ -1,21 +1,22 @@
 [project]
 name = "workspace"
 version = "0.1.0"
-description = "Run filetimecluster on a folder of files and build the event folders."
+description = "Run filenamecluster on a folder of files and build the event folders."
 authors = [{ name = "Rajas Chavadekar", email = "rvchavadekar@gmail.com" }]
 requires-python = ">=3.11"
-dependencies = ["filetimecluster"]
+dependencies = ["filenamecluster"]
 
 [project.urls]
 Readme = "../readme.md"
 Algorithm = "../docs/algorithm.md"
 Architecture = "../docs/architecture.md"
+Devops = "../docs/devops.md"
 
 [project.scripts]
 stub = "stub:main"
 
 [project.gui-scripts]
-filetimecluster = "filetimecluster.ui.app:main"
+filenamecluster = "filenamecluster.ui.app:main"
 
 [dependency-groups]
 dev = [
@@ -38,7 +39,7 @@ only-include = ["src/stub.py"]
 python-preference = "only-managed"
 
 [tool.uv.sources]
-filetimecluster = { path = "../filenamecluster", editable = true }
+filenamecluster = { path = "../filenamecluster", editable = true }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

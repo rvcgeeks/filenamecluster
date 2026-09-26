@@ -3,7 +3,7 @@
 Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 Mathematics: ``docs/algorithm.md``. Design: ``docs/architecture.md``.
 
-The file is ``filetimecluster-model.json``, sitting next to the photos so it
+The file is ``filenamecluster-model.json``, sitting next to the photos so it
 can be opened and inspected. It records the boundary learned from timestamps.
 It is not a hidden file.
 """
@@ -14,9 +14,9 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from filetimecluster.core.learn import GapModel
+from filenamecluster.core.learn import GapModel
 
-MODEL_NAME = "filetimecluster-model.json"
+MODEL_NAME = "filenamecluster-model.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,7 +34,7 @@ def model_path(directory: Path | str) -> Path:
 
 
 def load_model(directory: Path | str) -> FolderModel:
-    """Load ``filetimecluster-model.json``, or an empty model when it is absent."""
+    """Load ``filenamecluster-model.json``, or an empty model when it is absent."""
 
     path = model_path(directory)
     if not path.is_file():

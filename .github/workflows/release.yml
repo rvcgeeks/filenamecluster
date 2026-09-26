@@ -1,6 +1,7 @@
-# Builds the PyInstaller app on Linux, Windows, and macOS.
-# Pushing a tag named v* (for example v0.1.0) publishes the archives
-# as a GitHub Release. A manual run only stores Actions artifacts.
+# Builds one PyInstaller program on Linux, Windows, and macOS.
+# A tag named v* (for example v0.1.0) publishes those files on a GitHub
+# Release, each with a direct download link. A manual run only stores
+# Actions artifacts. Nothing is published to PyPI.
 
 name: Release
 
@@ -25,6 +26,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check the tag matches the version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' filenamecluster/pyproject.toml)"
+          if [ "$GITHUB_REF_NAME" != "v${version}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} must be v${version}, the version in filenamecluster/pyproject.toml." >&2
+            exit 1
+          fi
+
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           cache-dependency-glob: filenamecluster/uv.lock
@@ -47,23 +59,39 @@ jobs:
         working-directory: filenamecluster
         run: uv run build
 
-      - name: Archive the app
+      - name: Name the download
+        id: bundle
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p archives
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            ditto -c -k --keepParent filenamecluster/dist/filetimecluster.app archives/filetimecluster-macos.zip
-          elif [ "$RUNNER_OS" = "Linux" ]; then
-            tar -C filenamecluster/dist -czf archives/filetimecluster-linux.tar.gz filetimecluster
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="$GITHUB_REF_NAME"
           else
-            tar -C filenamecluster/dist -a -cf archives/filetimecluster-windows.zip filetimecluster
+            version="v$(sed -n 's/^version = "\(.*\)"$/\1/p' filenamecluster/pyproject.toml)"
           fi
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            file="filenamecluster-${version}-macos.dmg"
+            hdiutil create \
+              -volname "filenamecluster" \
+              -srcfolder "filenamecluster/dist/filenamecluster.app" \
+              -ov \
+              -format UDZO \
+              "$file"
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            file="filenamecluster-${version}-linux"
+            cp filenamecluster/dist/filenamecluster "$file"
+            chmod +x "$file"
+          else
+            file="filenamecluster-${version}-windows.exe"
+            cp filenamecluster/dist/filenamecluster.exe "$file"
+          fi
+          echo "file=${file}" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "$file")" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: filetimecluster-${{ runner.os }}
-          path: archives/*
+          name: ${{ steps.bundle.outputs.name }}
+          path: ${{ steps.bundle.outputs.file }}
           if-no-files-found: error
 
   release:
@@ -84,11 +112,42 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          notes="Native PyInstaller builds. The macOS zip is an Apple silicon app (filetimecluster.app). The Windows zip and Linux tar.gz each contain the filetimecluster folder."
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" artifacts/* --clobber
+          tag="$GITHUB_REF_NAME"
+          base="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${tag}"
+          mkdir -p publish
+          while IFS= read -r -d '' file; do
+            cp "$file" "publish/$(basename "$file")"
+          done < <(find artifacts -type f -print0)
+          mapfile -t files < <(find publish -type f | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No release files were built." >&2
+            exit 1
+          fi
+          {
+            echo "File Name Cluster ${tag}."
+            echo
+            echo "## Downloads"
+            echo
+            for file in "${files[@]}"; do
+              name="$(basename "$file")"
+              case "$name" in
+                *.exe) detail="Windows program." ;;
+                *.dmg) detail="macOS disk image. Open it and run filenamecluster.app." ;;
+                *-linux) detail="Linux program. Run chmod +x on the file before starting it." ;;
+                *) detail="" ;;
+              esac
+              if [ -n "$detail" ]; then
+                echo "- [${name}](${base}/${name}) — ${detail}"
+              else
+                echo "- [${name}](${base}/${name})"
+              fi
+            done
+          } > notes.md
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+            gh release edit "$tag" --notes-file notes.md
           else
-            gh release create "$GITHUB_REF_NAME" artifacts/* \
-              --title "$GITHUB_REF_NAME" \
-              --notes "$notes"
+            gh release create "$tag" "${files[@]}" \
+              --title "$tag" \
+              --notes-file notes.md
           fi

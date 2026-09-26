@@ -5,7 +5,7 @@ Introduction: ``readme.md``. Mathematics: ``docs/algorithm.md``.
 Design: ``docs/architecture.md``.
 """
 
-from filetimecluster.ui.i18n import t
+from filenamecluster.ui.i18n import t
 
 SECTION_KEYS: tuple[tuple[str, str], ...] = (
     ("about_what_title", "about_what_body"),

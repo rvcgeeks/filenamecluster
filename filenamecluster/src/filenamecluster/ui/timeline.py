@@ -10,10 +10,10 @@ from datetime import datetime
 from tkinter import ttk
 from typing import Callable, Sequence
 
-from filetimecluster.core.organize import NamedCluster
-from filetimecluster.ui import theme
-from filetimecluster.ui.i18n import t
-from filetimecluster.ui.layout import (
+from filenamecluster.core.organize import NamedCluster
+from filenamecluster.ui import theme
+from filenamecluster.ui.i18n import t
+from filenamecluster.ui.layout import (
     Bar,
     TimeScale,
     axis_ticks,

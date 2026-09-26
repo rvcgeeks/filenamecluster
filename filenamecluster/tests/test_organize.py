@@ -5,16 +5,16 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filetimecluster.core.cluster import Cluster, ClusterParams
-from filetimecluster.core.organize import (
+from filenamecluster.core.cluster import Cluster, ClusterParams
+from filenamecluster.core.organize import (
     cluster_name,
     flatten_cluster_folders,
     is_cluster_folder_name,
     move_into_cluster_folders,
     name_clusters,
 )
-from filetimecluster.core.parse import TimestampedFile
-from filetimecluster.core.pipeline import cluster_directory
+from filenamecluster.core.parse import TimestampedFile
+from filenamecluster.core.pipeline import cluster_directory
 
 
 def stamp(name: str, when: datetime) -> TimestampedFile:
@@ -120,7 +120,7 @@ class PipelineTests(unittest.TestCase):
             loose = sorted(
                 path.name
                 for path in root.iterdir()
-                if path.is_file() and path.name != "filetimecluster-model.json"
+                if path.is_file() and path.name != "filenamecluster-model.json"
             )
             self.assertEqual(loose, [])
             self.assertEqual(

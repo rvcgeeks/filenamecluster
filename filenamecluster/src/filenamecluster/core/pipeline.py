@@ -9,11 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from filetimecluster.core.cluster import ClusterParams, cluster_files
-from filetimecluster.core.learn import GapModel
-from filetimecluster.core.model_file import load_model, save_model
-from filetimecluster.core.organize import NamedCluster, name_clusters
-from filetimecluster.core.parse import (
+from filenamecluster.core.cluster import ClusterParams, cluster_files
+from filenamecluster.core.learn import GapModel
+from filenamecluster.core.model_file import load_model, save_model
+from filenamecluster.core.organize import NamedCluster, name_clusters
+from filenamecluster.core.parse import (
     TimestampPatterns,
     TimestampedFile,
     parse_timestamp,

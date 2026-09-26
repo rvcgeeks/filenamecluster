@@ -3,11 +3,11 @@
 import unittest
 from datetime import date, datetime, timedelta
 
-from filetimecluster.core.cluster import Cluster
-from filetimecluster.core.organize import name_clusters
-from filetimecluster.core.parse import TimestampedFile
-from filetimecluster.ui.calendar_view import month_weeks, shift_month, summarize_days
-from filetimecluster.ui.layout import (
+from filenamecluster.core.cluster import Cluster
+from filenamecluster.core.organize import name_clusters
+from filenamecluster.core.parse import TimestampedFile
+from filenamecluster.ui.calendar_view import month_weeks, shift_month, summarize_days
+from filenamecluster.ui.layout import (
     MARGIN,
     MAX_WIDTH,
     MIN_BAR,

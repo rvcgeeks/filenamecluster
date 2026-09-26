@@ -8,11 +8,11 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from filetimecluster.core.parse import TimestampPatterns
-from filetimecluster.ui import app as app_module
-from filetimecluster.ui import theme
-from filetimecluster.ui.app import ClusterApp
-from filetimecluster.ui.i18n import set_language, t
+from filenamecluster.core.parse import TimestampPatterns
+from filenamecluster.ui import app as app_module
+from filenamecluster.ui import theme
+from filenamecluster.ui.app import ClusterApp
+from filenamecluster.ui.i18n import set_language, t
 
 PHOTOS = (
     "IMG_20240101_100000.jpg",
@@ -58,7 +58,7 @@ class AppTests(unittest.TestCase):
         about = self.app.about_text.get("1.0", "end")
         self.assertIn("Apply clustering", about)
         self.assertIn("Flatten clustering", about)
-        self.assertIn("filetimecluster-model.json", about)
+        self.assertIn("filenamecluster-model.json", about)
         self.assertIn("timestamps only", about)
         self.assertIn("1990 and 2100", about)
         self.assertIn("Filename patterns", about)
@@ -173,7 +173,7 @@ class AppTests(unittest.TestCase):
 
     def test_model_file_is_visible_and_holds_only_the_learned_boundary(self):
         self.app.load_folder(self.folder)
-        model_file = self.folder / "filetimecluster-model.json"
+        model_file = self.folder / "filenamecluster-model.json"
         self.assertTrue(model_file.is_file())
         self.assertFalse(model_file.name.startswith("."))
         self.assertFalse(hasattr(self.app, "split_button"))
@@ -202,10 +202,10 @@ class AppTests(unittest.TestCase):
         loose = sorted(
             path.name
             for path in self.folder.iterdir()
-            if path.is_file() and path.name != "filetimecluster-model.json"
+            if path.is_file() and path.name != "filenamecluster-model.json"
         )
         self.assertEqual(loose, ["notes.txt"])
-        self.assertTrue((self.folder / "filetimecluster-model.json").is_file())
+        self.assertTrue((self.folder / "filenamecluster-model.json").is_file())
         folders = sorted(path.name for path in self.folder.iterdir() if path.is_dir())
         self.assertEqual(len(folders), 3)
         self.assertEqual(len(self.app.result.clusters), 2)
@@ -250,7 +250,7 @@ class AppTests(unittest.TestCase):
             sorted(
                 path.name
                 for path in self.folder.iterdir()
-                if path.is_file() and path.name != "filetimecluster-model.json"
+                if path.is_file() and path.name != "filenamecluster-model.json"
             ),
             ["notes.txt"],
         )
@@ -265,7 +265,7 @@ class AppTests(unittest.TestCase):
         loose = sorted(
             path.name
             for path in self.folder.iterdir()
-            if path.is_file() and path.name != "filetimecluster-model.json"
+            if path.is_file() and path.name != "filenamecluster-model.json"
         )
         self.assertEqual(loose, sorted(PHOTOS))
         self.assertEqual(
@@ -372,7 +372,7 @@ class WidgetTests(unittest.TestCase):
         self.assertIsNone(view.scale)
 
     def test_zoom_labels(self):
-        from filetimecluster.ui.timeline import _describe_zoom
+        from filenamecluster.ui.timeline import _describe_zoom
 
         self.assertEqual(_describe_zoom(48), "1 hour = 2 px")
         self.assertEqual(_describe_zoom(5), "1 day = 5 px")

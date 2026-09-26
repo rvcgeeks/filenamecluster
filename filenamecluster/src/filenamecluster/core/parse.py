@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from filetimecluster.core.model_file import MODEL_NAME
+from filenamecluster.core.model_file import MODEL_NAME
 
 # Higher wins when several stamps sit in one name. A camera-style
 # YYYYMMDD_HHMMSS beats a trailing epoch (often an export id) and a bare date.

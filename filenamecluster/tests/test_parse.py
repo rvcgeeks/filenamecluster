@@ -5,8 +5,8 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filetimecluster.core.parse import TimestampPatterns, parse_timestamp, scan_directory
-from filetimecluster.core.pipeline import cluster_directory
+from filenamecluster.core.parse import TimestampPatterns, parse_timestamp, scan_directory
+from filenamecluster.core.pipeline import cluster_directory
 
 
 class ParseTimestampTests(unittest.TestCase):
@@ -76,7 +76,7 @@ class ParseTimestampTests(unittest.TestCase):
         self.assertIsNone(parse_timestamp("img9999999999999.jpg"))
 
     def test_epoch_overflow_is_ignored(self):
-        from filetimecluster.core.parse import _from_epoch_millis
+        from filenamecluster.core.parse import _from_epoch_millis
 
         self.assertIsNone(_from_epoch_millis(10**30, 1990, 2100))
 

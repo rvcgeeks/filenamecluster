@@ -2,7 +2,7 @@
 
 import unittest
 
-from filetimecluster.ui.i18n import CATALOGS, set_language, t
+from filenamecluster.ui.i18n import CATALOGS, set_language, t
 
 
 class CatalogTests(unittest.TestCase):
@@ -17,7 +17,7 @@ class CatalogTests(unittest.TestCase):
             self.assertTrue(all(value.strip() for value in catalog.values()))
         self.assertEqual(t("apply"), "Apply clustering")
         self.assertEqual(t("flatten"), "Flatten clustering")
-        self.assertIn("filetimecluster-model.json", t("about_options_body"))
+        self.assertIn("filenamecluster-model.json", t("about_options_body"))
         self.assertIn("timestamps only", t("about_options_body"))
         set_language("hi")
         self.assertNotEqual(t("apply"), "Apply clustering")

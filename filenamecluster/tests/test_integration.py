@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filetimecluster.core.organize import cluster_name, move_into_cluster_folders
-from filetimecluster.core.parse import parse_timestamp
-from filetimecluster.core.pipeline import cluster_directory
+from filenamecluster.core.organize import cluster_name, move_into_cluster_folders
+from filenamecluster.core.parse import parse_timestamp
+from filenamecluster.core.pipeline import cluster_directory
 
 LISTING = Path(__file__).resolve().parents[2] / "workspace" / "filenames.txt"
 DIR_ROW = re.compile(r"^\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}\s+(<DIR>|[\d,]+)\s+(.*\S)\s*$")
@@ -90,10 +90,10 @@ class CameraRollTests(unittest.TestCase):
         loose = sorted(
             path.name
             for path in self.root.iterdir()
-            if path.is_file() and path.name != "filetimecluster-model.json"
+            if path.is_file() and path.name != "filenamecluster-model.json"
         )
         self.assertEqual(loose, sorted(self.result.ignored_without_timestamp))
-        self.assertTrue((self.root / "filetimecluster-model.json").is_file())
+        self.assertTrue((self.root / "filenamecluster-model.json").is_file())
         again = cluster_directory(self.root)
         again_names = [[item.name for item in cluster.files] for cluster in again.clusters]
         first_names = [[item.name for item in cluster.files] for cluster in self.result.clusters]

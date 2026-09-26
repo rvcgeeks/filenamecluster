@@ -12,25 +12,25 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from filetimecluster.core.cluster import ClusterParams
-from filetimecluster.core.model_file import MODEL_NAME
-from filetimecluster.core.organize import (
+from filenamecluster.core.cluster import ClusterParams
+from filenamecluster.core.model_file import MODEL_NAME
+from filenamecluster.core.organize import (
     flatten_cluster_folders,
     is_cluster_folder_name,
     move_into_cluster_folders,
 )
-from filetimecluster.core.parse import (
+from filenamecluster.core.parse import (
     LIMIT_FIELDS,
     PATTERN_FIELDS,
     TimestampPatterns,
     TimestampedFile,
 )
-from filetimecluster.core.pipeline import ClusterResult, cluster_directory
-from filetimecluster.ui import theme
-from filetimecluster.ui.about import sections
-from filetimecluster.ui.calendar_view import CalendarView
-from filetimecluster.ui.i18n import LANGUAGES, file_count, language, set_language, t
-from filetimecluster.ui.timeline import TimelineView
+from filenamecluster.core.pipeline import ClusterResult, cluster_directory
+from filenamecluster.ui import theme
+from filenamecluster.ui.about import sections
+from filenamecluster.ui.calendar_view import CalendarView
+from filenamecluster.ui.i18n import LANGUAGES, file_count, language, set_language, t
+from filenamecluster.ui.timeline import TimelineView
 
 DEFAULTS = ClusterParams()
 

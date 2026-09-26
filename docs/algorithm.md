@@ -4,7 +4,7 @@ Rajas Chavadekar (rvchavadekar@gmail.com)
 
 A folder is one sequence of capture times. The only observation used from file $i$ is its filename timestamp $t_i$. Image bytes are not a variable in this model.
 
-Line numbers below are the current source under `filenamecluster/src/filetimecluster/core/`.
+Line numbers below are the current source under `filenamecluster/src/filenamecluster/core/`.
 
 > **In simple words.** Imagine a big box of photos. Every photo has a little clock written in its name, like `IMG_20240101_101500.jpg`, which means “1 January 2024, 10:15:00”. This app only reads that clock. It never looks at the picture itself, so it does not know if the photo shows a cat, a cake, or a beach.
 >
@@ -112,7 +112,13 @@ Several methods are simpler than the two-component model but lose something impo
 
 **Largest-gap rule.** Split at the largest gap, or at the largest few gaps. This requires choosing the number of events in advance. One enormous outlier can also make every other genuine boundary look small.
 
-**Mean or median times a constant.** Split when $g_i > k\,\operatorname{median}(g)$. This adapts to the overall pace, but the constant $k$ is still universal. It assumes one rhythm plus outliers rather than explicitly representing both within-event and between-event rhythms.
+**Mean or median times a constant.** Split when
+
+$$
+g_i > k\,\mathrm{median}(g).
+$$
+
+This adapts to the overall pace, but the constant $k$ is still universal. It assumes one rhythm plus outliers rather than explicitly representing both within-event and between-event rhythms.
 
 **A percentile.** Split above, for example, the 90th percentile. This forces roughly 10% of eligible gaps to split even when a folder is one continuous trip, and can force too few splits when a folder contains many separate occasions.
 
@@ -271,7 +277,7 @@ $$
 That is the log-normal density. It is zero for $g \le 0$ and has a long right tail, which is the shape of real waiting times. Its median follows from $P(g \le m) = P(x \le \ln m) = \tfrac12$, which holds at $\ln m = \mu$:
 
 $$
-\operatorname{median}(g) = e^{\mu}.
+\mathrm{median}(g) = e^{\mu}.
 $$
 
 This is why section 7 reports $e^{\mu_w}$ and $e^{\mu_b}$ as “typical” hours. They are medians, not means. The mean would be $e^{\mu+\sigma^2/2}$, which a few very long gaps pull upward.
@@ -830,7 +836,7 @@ Code: `cluster.py` lines 102–105. The flowchart above is that branch together 
 
 The fitted triple $(e^{\mu_w}, e^{\mu_b}, e^{\tau})$ and the flag $\mu_b-\mu_w \ge 1 \land 0.05 < \pi_w < 0.95$ are written in full floating-point precision. They are not rounded.
 
-> **In simple words.** After learning, the app writes a small note next to your photos, in a file called `filetimecluster-model.json`. It holds four things:
+> **In simple words.** After learning, the app writes a small note next to your photos, in a file called `filenamecluster-model.json`. It holds four things:
 >
 > - the typical wait inside an event, in hours,
 > - the typical wait between events, in hours,

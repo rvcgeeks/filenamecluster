@@ -131,7 +131,7 @@ toml = [
 ]
 
 [[package]]
-name = "filetimecluster"
+name = "filenamecluster"
 version = "0.1.0"
 source = { editable = "../filenamecluster" }
 
@@ -382,7 +382,7 @@ name = "workspace"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "filetimecluster" },
+    { name = "filenamecluster" },
 ]
 
 [package.dev-dependencies]
@@ -393,7 +393,7 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "filetimecluster", editable = "../filenamecluster" }]
+requires-dist = [{ name = "filenamecluster", editable = "../filenamecluster" }]
 
 [package.metadata.requires-dev]
 dev = [

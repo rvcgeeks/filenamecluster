@@ -4,10 +4,10 @@ import math
 import unittest
 from datetime import datetime, timedelta
 
-from filetimecluster.core.cluster import ClusterParams, cluster_files
-from filetimecluster.core.learn import fit_gap_model
-from filetimecluster.core.model_file import FolderModel
-from filetimecluster.core.parse import TimestampedFile
+from filenamecluster.core.cluster import ClusterParams, cluster_files
+from filenamecluster.core.learn import fit_gap_model
+from filenamecluster.core.model_file import FolderModel
+from filenamecluster.core.parse import TimestampedFile
 
 
 def files_at(*points: datetime) -> list[TimestampedFile]:
@@ -113,7 +113,7 @@ class ClusterFilesTests(unittest.TestCase):
         self.assertTrue(all(cluster.end - cluster.start < timedelta(days=10) for cluster in clusters))
 
     def test_a_saved_boundary_is_kept_when_too_few_pauses_remain(self):
-        from filetimecluster.core.learn import GapModel
+        from filenamecluster.core.learn import GapModel
 
         start = datetime(2024, 1, 1, 10, 0, 0)
         photos = files_at(start, start + timedelta(hours=10))
@@ -139,8 +139,8 @@ class ClusterFilesTests(unittest.TestCase):
         from tempfile import TemporaryDirectory
         from pathlib import Path
 
-        from filetimecluster.core.learn import GapModel
-        from filetimecluster.core.model_file import load_model, save_model
+        from filenamecluster.core.learn import GapModel
+        from filenamecluster.core.model_file import load_model, save_model
 
         learned = GapModel(
             within_hours=math.pi,

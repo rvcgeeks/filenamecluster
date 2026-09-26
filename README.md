@@ -23,15 +23,16 @@ The Clusters tab. The timeline is the whole folder, to scale. The calendar colou
 | This file | [readme.md](readme.md) |
 | The mathematics | [algorithm.md](docs/algorithm.md) |
 | Components, classes, HLD, LLD | [architecture.md](docs/architecture.md) |
+| Releases and tags | [devops.md](docs/devops.md) |
 
-This readme is at the project root. `algorithm.md` and `architecture.md` live in `docs/`, beside `workspace` and `filenamecluster`.
+This readme is at the project root. `algorithm.md`, `architecture.md`, and `devops.md` live in `docs/`, beside `workspace` and `filenamecluster`.
 
 ## Run it
 
 From `workspace`, with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv run filetimecluster
+uv run filenamecluster
 ```
 
 The interpreter is the uv-managed Python, which has Tk. Choose a folder in the window. The preview is drawn immediately. **Apply clustering** creates the event folders and moves the files. **Flatten clustering** moves those files back and removes the event folders. Other subfolders are left alone.
@@ -59,7 +60,7 @@ In the folder you chose, next to the files, not hidden:
 }
 ```
 
-`filetimecluster-model.json` keeps the fitted hours at full precision. A later batch that is too small to fit a new boundary reuses these numbers. The scan ignores this filename, so it is not treated as a photo.
+`filenamecluster-model.json` keeps the fitted hours at full precision. A later batch that is too small to fit a new boundary reuses these numbers. The scan ignores this filename, so it is not treated as a photo.
 
 Event folders are named so a plain sort follows time:
 
@@ -71,9 +72,9 @@ Event folders are named so a plain sort follows time:
 ## Layout
 
 ```text
-filetimecluster/
+filenamecluster/
   readme.md             this introduction
-  docs/                 algorithm, architecture, assets
+  docs/                 algorithm, architecture, devops, assets
   filenamecluster/      the package and the Tk app
   workspace/            uv project that runs the app; data/ and filenames.txt
 ```

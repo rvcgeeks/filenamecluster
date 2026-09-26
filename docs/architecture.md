@@ -6,9 +6,9 @@ The mathematics of the boundary is in [algorithm.md](algorithm.md). This file is
 
 ## High-level design
 
-File Time Cluster is a desktop app. A person picks one folder. The app reads capture times out of filenames, learns one event boundary for that folder, draws the events, and, on confirmation, moves files into one folder per event. A later batch dropped into the same folder is clustered together with the files already filed.
+File Name Cluster is a desktop app. A person picks one folder. The app reads capture times out of filenames, learns one event boundary for that folder, draws the events, and, on confirmation, moves files into one folder per event. A later batch dropped into the same folder is clustered together with the files already filed.
 
-Nothing in that path opens an image. The model file `filetimecluster-model.json` sits in the chosen folder, visible, and stores the last fitted boundary at full precision.
+Nothing in that path opens an image. The model file `filenamecluster-model.json` sits in the chosen folder, visible, and stores the last fitted boundary at full precision.
 
 ```mermaid
 flowchart LR
@@ -58,7 +58,7 @@ flowchart TB
     subgraph storage["Folder on disk"]
         loose["Loose files"]
         events["Event folders"]
-        json["filetimecluster-model.json"]
+        json["filenamecluster-model.json"]
         other["Other subfolders, not entered"]
     end
 
@@ -229,7 +229,7 @@ Inside `cluster_files` the steps are exactly those in [algorithm.md](algorithm.m
 
 Inside `parse_timestamp`, every enabled expression is tried. A match produces a candidate `(priority, start index, datetime)`. The highest priority wins. A tie keeps the earlier match in the name. A blank expression is off. A clock needs groups `y, mo, d, h, mi, s`. A day-month clock needs `a, b, y, h, mi`. An epoch needs `ms` and is converted with `datetime.fromtimestamp`. A date-only stamp is local midnight. Years outside the window are rejected.
 
-`scan_directory` lists the chosen folder only one level down. A subdirectory whose name matches an event folder is opened, and only its immediate files are taken. Any other subdirectory is recorded and not entered. `filetimecluster-model.json` is never treated as a photo.
+`scan_directory` lists the chosen folder only one level down. A subdirectory whose name matches an event folder is opened, and only its immediate files are taken. Any other subdirectory is recorded and not entered. `filenamecluster-model.json` is never treated as a photo.
 
 ### Apply
 
@@ -295,4 +295,4 @@ Options are not a second clustering mode. They are the inputs of the same functi
 
 Failure stays local. An unreadable folder sets the status line. A move that would overwrite stops and reports `FileExistsError` or `OSError`. A model file that cannot be written is skipped; the preview still appears. A model file that is not valid JSON, or whose `learned` object is missing fields, loads as no saved boundary.
 
-The icon shown by the window is `filenamecluster/src/filetimecluster/ui/assets/icon.svg`, rasterized to `icon.png` beside it because Tk’s `PhotoImage` loads the PNG.
+The icon shown by the window is `filenamecluster/src/filenamecluster/ui/assets/icon.svg`, rasterized to `icon.png` beside it because Tk’s `PhotoImage` loads the PNG.

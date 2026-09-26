@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterator, Sequence
 
-from filetimecluster.core.organize import NamedCluster
+from filenamecluster.core.organize import NamedCluster
 
 SECONDS_PER_DAY = 86_400
 MARGIN = 48

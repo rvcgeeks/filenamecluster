@@ -18,8 +18,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from filetimecluster.core.cluster import Cluster
-from filetimecluster.core.parse import TimestampedFile, is_cluster_folder_name
+from filenamecluster.core.cluster import Cluster
+from filenamecluster.core.parse import TimestampedFile, is_cluster_folder_name
 
 
 @dataclass(frozen=True, slots=True)

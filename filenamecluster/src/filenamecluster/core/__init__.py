@@ -5,21 +5,21 @@ Introduction: ``readme.md``. Mathematics: ``docs/algorithm.md``.
 Design: ``docs/architecture.md``.
 """
 
-from filetimecluster.core.cluster import Cluster, ClusterParams, cluster_files
-from filetimecluster.core.organize import (
+from filenamecluster.core.cluster import Cluster, ClusterParams, cluster_files
+from filenamecluster.core.organize import (
     NamedCluster,
     cluster_name,
     flatten_cluster_folders,
     is_cluster_folder_name,
     move_into_cluster_folders,
 )
-from filetimecluster.core.parse import (
+from filenamecluster.core.parse import (
     TimestampPatterns,
     TimestampedFile,
     parse_timestamp,
     scan_directory,
 )
-from filetimecluster.core.pipeline import ClusterResult, cluster_directory
+from filenamecluster.core.pipeline import ClusterResult, cluster_directory
 
 __all__ = [
     "Cluster",

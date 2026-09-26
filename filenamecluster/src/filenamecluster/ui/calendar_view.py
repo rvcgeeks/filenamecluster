@@ -12,9 +12,9 @@ from datetime import date, timedelta
 from tkinter import ttk
 from typing import Callable, Sequence
 
-from filetimecluster.core.organize import NamedCluster
-from filetimecluster.ui import theme
-from filetimecluster.ui.i18n import file_count, t
+from filenamecluster.core.organize import NamedCluster
+from filenamecluster.ui import theme
+from filenamecluster.ui.i18n import file_count, t
 
 PHOTO_FILLS = ("#aed6f1", "#7fb9e6")
 SPAN_FILL = "#e3f0fa"

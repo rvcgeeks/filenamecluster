@@ -16,9 +16,9 @@ import math
 from dataclasses import dataclass
 from datetime import timedelta
 
-from filetimecluster.core.learn import GapModel, fit_gap_model
-from filetimecluster.core.model_file import FolderModel
-from filetimecluster.core.parse import TimestampedFile
+from filenamecluster.core.learn import GapModel, fit_gap_model
+from filenamecluster.core.model_file import FolderModel
+from filenamecluster.core.parse import TimestampedFile
 
 
 @dataclass(frozen=True, slots=True)
