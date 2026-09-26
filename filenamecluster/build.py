@@ -21,10 +21,12 @@ ANALYSIS = ROOT / "pyinstaller"
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Freeze one program file into ``dist/`` for this machine.
+    """Freeze the app into ``dist/`` for this machine.
 
-    Windows writes ``dist/filenamecluster.exe``, Linux writes
-    ``dist/filenamecluster``, and Mac writes ``dist/filenamecluster.app``.
+    Windows writes ``dist/filenamecluster.exe`` and Linux writes
+    ``dist/filenamecluster``, each as one file. Mac writes
+    ``dist/filenamecluster.app``. A Mac app bundle cannot be one file, so
+    that build stays a folder inside the ``.app``.
     PyInstaller's spec file and analysis folder are removed after a successful
     build. On a Mac an extra folder beside the app is removed too.
     Pass ``--no-cleanup`` to keep the analysis files.
@@ -51,18 +53,25 @@ def main(argv: list[str] | None = None) -> int:
         "--noconfirm",
         "--clean",
         "--windowed",
-        "--onefile",
-        "--name",
-        "filenamecluster",
-        "--specpath",
-        str(ANALYSIS),
-        "--workpath",
-        str(ANALYSIS / "work"),
-        "--distpath",
-        str(ROOT / "dist"),
-        "--paths",
-        str(ROOT / "src"),
     ]
+    # A Mac .app is a folder. One-file mode cannot wrap it, and PyInstaller 7
+    # will reject that combination.
+    if sys.platform != "darwin":
+        command.append("--onefile")
+    command.extend(
+        [
+            "--name",
+            "filenamecluster",
+            "--specpath",
+            str(ANALYSIS),
+            "--workpath",
+            str(ANALYSIS / "work"),
+            "--distpath",
+            str(ROOT / "dist"),
+            "--paths",
+            str(ROOT / "src"),
+        ]
+    )
     for path, destination in _bundled_files():
         command.extend(["--add-data", f"{path}{os.pathsep}{destination}"])
     command.append(str(entry))
@@ -77,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     print("Removed PyInstaller analysis files from pyinstaller/.")
     dist = ROOT / "dist"
     extra = dist / "filenamecluster"
-    if (dist / "filenamecluster.app").is_dir() and extra.exists():
+    if (dist / "filenamecluster.app").is_dir() and extra.is_dir():
         shutil.rmtree(extra)
         print("Removed dist/filenamecluster; the Mac app is dist/filenamecluster.app.")
     return 0
