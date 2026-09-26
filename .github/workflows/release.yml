@@ -1,0 +1,94 @@
+# Builds the PyInstaller app on Linux, Windows, and macOS.
+# Pushing a tag named v* (for example v0.1.0) publishes the archives
+# as a GitHub Release. A manual run only stores Actions artifacts.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          cache-dependency-glob: filenamecluster/uv.lock
+
+      - name: Install Tk libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-6 libxext6 libxrender1 libxft2 libxss1
+
+      - name: Install the project
+        working-directory: filenamecluster
+        run: uv sync --frozen --group dev
+
+      - name: Check that this Python has Tk
+        working-directory: filenamecluster
+        run: uv run python -c "import tkinter"
+
+      - name: Build the executable
+        working-directory: filenamecluster
+        run: uv run build
+
+      - name: Archive the app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p archives
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            ditto -c -k --keepParent filenamecluster/dist/filetimecluster.app archives/filetimecluster-macos.zip
+          elif [ "$RUNNER_OS" = "Linux" ]; then
+            tar -C filenamecluster/dist -czf archives/filetimecluster-linux.tar.gz filetimecluster
+          else
+            tar -C filenamecluster/dist -a -cf archives/filetimecluster-windows.zip filetimecluster
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: filetimecluster-${{ runner.os }}
+          path: archives/*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create or update the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          notes="Native PyInstaller builds. The macOS zip is an Apple silicon app (filetimecluster.app). The Windows zip and Linux tar.gz each contain the filetimecluster folder."
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" artifacts/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" artifacts/* \
+              --title "$GITHUB_REF_NAME" \
+              --notes "$notes"
+          fi

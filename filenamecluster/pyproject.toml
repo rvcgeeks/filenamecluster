@@ -1,0 +1,60 @@
+[project]
+name = "filetimecluster"
+version = "0.1.0"
+description = "Tkinter app that clusters camera-roll files into chronological events using the timestamp embedded in each name."
+authors = [{ name = "Rajas Chavadekar", email = "rvchavadekar@gmail.com" }]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.urls]
+Readme = "../readme.md"
+Algorithm = "../docs/algorithm.md"
+Architecture = "../docs/architecture.md"
+
+[project.gui-scripts]
+filetimecluster = "filetimecluster.ui.app:main"
+
+[project.scripts]
+build = "filetimecluster.build:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "pytest-html>=4.1",
+    "pyinstaller>=6.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/filetimecluster"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/filetimecluster/ui/i18n/en.json" = "filetimecluster/ui/i18n/en.json"
+"src/filetimecluster/ui/i18n/hi.json" = "filetimecluster/ui/i18n/hi.json"
+"src/filetimecluster/ui/i18n/mr.json" = "filetimecluster/ui/i18n/mr.json"
+"src/filetimecluster/ui/i18n/de.json" = "filetimecluster/ui/i18n/de.json"
+"src/filetimecluster/ui/i18n/fr.json" = "filetimecluster/ui/i18n/fr.json"
+"src/filetimecluster/ui/i18n/ja.json" = "filetimecluster/ui/i18n/ja.json"
+"src/filetimecluster/ui/i18n/ko.json" = "filetimecluster/ui/i18n/ko.json"
+
+[tool.uv]
+python-preference = "only-managed"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--cov=filetimecluster",
+    "--cov-report=term-missing",
+    "--cov-report=html:reports/coverage",
+    "--cov-fail-under=80",
+    "--html=reports/pytest.html",
+    "--self-contained-html",
+]
+
+[tool.coverage.run]
+source = ["filetimecluster"]
+branch = false
