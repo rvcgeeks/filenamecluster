@@ -1043,7 +1043,6 @@ def main() -> int:
     theme.prepare_process_dpi()
     root = tk.Tk()
     app = ClusterApp(root)
-    theme.enter_fullscreen(root)
     root.after_idle(app._finish_equal_columns)
     root.mainloop()
     return 0

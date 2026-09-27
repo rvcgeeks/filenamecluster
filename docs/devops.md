@@ -145,24 +145,47 @@ See the commit a tag names:
 git show v0.1.1 --no-patch
 ```
 
-A tag name can be used once on GitHub. Do not move a tag that people have already downloaded. Ship a new number instead (`v0.1.2`).
+A tag name can be used once on GitHub until you delete it. Ship a new number (`v0.1.2`) when anyone should keep the files they already downloaded.
 
-If a tag was pushed and the build failed because of a typo in the version, you can delete that unused tag and try again:
+### Publish the same tag again
+
+Use this when a Release for that tag already exists and you want to throw those files away and publish the same number from a chosen commit. The version in `filenamecluster/pyproject.toml` must still match the tag (`v0.1.1` needs `0.1.1`).
+
+1. Delete the Release and the tag on GitHub. `--cleanup-tag` removes the remote tag as well as the Release page.
+
+   ```bash
+   gh release delete v0.1.1 --yes --cleanup-tag
+   ```
+
+   The same two deletions can be done by hand: on the release page, choose **Delete**, then remove the tag with `git push origin :refs/tags/v0.1.1`.
+
+2. Delete the tag on your computer, then put it on the commit you want to ship.
+
+   ```bash
+   git tag -d v0.1.1
+   git checkout main
+   git pull origin main
+   git tag v0.1.1
+   ```
+
+   Commit and push any fix to `main` before the `git tag` line. The tag sticks to the commit that is checked out.
+
+3. Push that tag again.
+
+   ```bash
+   git push origin v0.1.1
+   ```
+
+   Actions starts a new run for `v0.1.1`. Wait until the three builds and **Publish release** are green. The Releases page shows `v0.1.1` again, with new download files.
+
+If the tag was pushed and no Release page exists, skip `gh release delete`. Delete the tag locally and on GitHub, then tag and push as above:
 
 ```bash
 git tag -d v0.1.1
 git push origin :refs/tags/v0.1.1
 ```
 
-If a Release page was also created, delete it before you reuse the name. On the release page, **Delete**, or:
-
-```bash
-gh release delete v0.1.1 --yes --cleanup-tag
-```
-
-`--cleanup-tag` deletes the GitHub tag as well. Then fix `main`, push it, and push the tag again only if nobody should keep the old files. If anyone already downloaded that version, leave it up and publish the fix as the next number.
-
-If the build failed for a temporary reason and the commit is fine, open the failed run and choose **Re-run failed jobs**. You do not need a new tag for that. Re-running a tag that already published replaces the same release's files.
+If the build failed and the commit is already the one you want, open the failed run and choose **Re-run failed jobs**. That uses the same tag and the same commit. When a Release already exists, a successful re-run replaces its files and notes.
 
 ## A build that is not a release
 

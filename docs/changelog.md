@@ -14,7 +14,7 @@ This file records user-visible changes to File Name Cluster. Versions follow sem
 - Filename regular expressions are editable in a table with Description and Pattern columns. Built-in rules remain visible, and users can add or remove custom rules.
 - Double-clicking the selected orange or yellow event in the calendar, either timeline, or the cluster list opens its existing folder in a separate file-manager window. A localised warning explains when the folder has not been created.
 - Double-clicking a file in **Day detail** opens it with the operating system's default application. Files already moved by Apply are resolved inside their event folder.
-- Retina/high-DPI scaling and fullscreen startup were added. The packaged macOS app declares high-resolution capability.
+- Retina/high-DPI scaling was added. The app opens in a normal window rather than fullscreen. The packaged macOS app declares high-resolution capability.
 - Calendar, timeline, pattern-table, metadata fallback, folder-opening, file-opening, and display behavior have automated coverage. UI tests keep Tk windows withdrawn.
 - The Options tab includes a read-only table of every field in `filenamecluster-model.json`: `learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, and `learned.separated`. Values match the file. A folder with no fitted boundary shows `null`.
 

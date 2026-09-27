@@ -90,18 +90,6 @@ def prepare_process_dpi() -> None:
             return
 
 
-def enter_fullscreen(root: tk.Misc) -> None:
-    """Fill the screen on the machine that opened the window."""
-
-    try:
-        root.attributes("-fullscreen", True)
-    except tk.TclError:
-        try:
-            root.state("zoomed")
-        except tk.TclError:
-            return
-
-
 def sharpen(root: tk.Misc) -> None:
     """Rasterise text at the display scale when Tk is still painting at 1x.
 

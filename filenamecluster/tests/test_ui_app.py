@@ -659,19 +659,6 @@ class OpenFileTests(unittest.TestCase):
 
 
 class DisplayTests(unittest.TestCase):
-    def test_fullscreen_falls_back_when_the_window_cannot_fill_the_screen(self):
-        root = SimpleNamespace()
-
-        def attributes(*_args):
-            raise tk.TclError("no")
-
-        def state(*_args):
-            raise tk.TclError("no")
-
-        root.attributes = attributes
-        root.state = state
-        theme.enter_fullscreen(root)
-
     def test_windows_dpi_helpers_are_best_effort(self):
         with patch.object(theme.sys, "platform", "win32"):
             theme.prepare_process_dpi()
