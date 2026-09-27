@@ -69,6 +69,7 @@ class ClusterApp:
         self.directory: Path | None = None
         self.result: ClusterResult | None = None
         self.selected_cluster: int | None = None
+        self._cluster_sort: tuple[str, bool] | None = None
         self.selected_day: date | None = None
         self.files_by_day: dict[date, list[tuple[TimestampedFile, int]]] = {}
 
@@ -164,8 +165,10 @@ class ClusterApp:
         list_frame = self._text(ttk.LabelFrame(panes, padding=8), "clusters")
         self.cluster_tree = self._tree(
             list_frame,
-            (("number", "col_number", 50, "e"), ("name", "col_folder", 320, "w"), ("files", "col_files", 60, "e")),
+            (("number", "col_number", 64, "e"), ("name", "col_folder", 320, "w"), ("files", "col_files", 110, "e")),
         )
+        for column in ("number", "files"):
+            self.cluster_tree.heading(column, command=lambda col=column: self.sort_clusters(col))
         self.cluster_tree.bind("<<TreeviewSelect>>", self._tree_selected)
         self.cluster_tree.bind("<Double-1>", self._tree_double)
         panes.add(list_frame, weight=3)
@@ -662,6 +665,7 @@ class ClusterApp:
             self.cluster_tree.insert(
                 "", "end", iid=str(index), values=(cluster.number, cluster.name, len(cluster.files))
             )
+        self._apply_cluster_sort()
 
         self._fill_skipped(result)
         self._fill_model_view()
@@ -725,7 +729,8 @@ class ClusterApp:
             self.notebook.tab(index, text=t(key))
         for tree, columns in self._headings:
             for column, key in columns:
-                tree.heading(column, text=t(key))
+                text = self._cluster_heading_text(column, key) if tree is self.cluster_tree else t(key)
+                tree.heading(column, text=text)
         self._fill_about()
         self._fill_model_view()
         self.overview.set_placeholder(t("placeholder_timeline"))
@@ -929,6 +934,44 @@ class ClusterApp:
         self._pattern_editor = None
         entry.destroy()
 
+    def sort_clusters(self, column: str) -> None:
+        """Sort the cluster list by event number or file count, toggling direction."""
+
+        if column not in {"number", "files"}:
+            return
+        if self._cluster_sort is not None and self._cluster_sort[0] == column:
+            descending = not self._cluster_sort[1]
+        else:
+            descending = False
+        self._cluster_sort = (column, descending)
+        self._apply_cluster_sort()
+
+    def _apply_cluster_sort(self) -> None:
+        sort = self._cluster_sort
+        rows = list(self.cluster_tree.get_children())
+        if sort is not None and rows:
+            column, descending = sort
+            rows.sort(
+                key=lambda iid: _cluster_sort_key(self.cluster_tree.set(iid, column), iid),
+                reverse=descending,
+            )
+            for index, iid in enumerate(rows):
+                self.cluster_tree.move(iid, "", index)
+            if self.selected_cluster is not None:
+                self.cluster_tree.see(str(self.selected_cluster))
+        self._refresh_cluster_headings()
+
+    def _refresh_cluster_headings(self) -> None:
+        columns = next(cols for tree, cols in self._headings if tree is self.cluster_tree)
+        for column, key in columns:
+            self.cluster_tree.heading(column, text=self._cluster_heading_text(column, key))
+
+    def _cluster_heading_text(self, column: str, key: str) -> str:
+        label = t(key)
+        if self._cluster_sort is not None and self._cluster_sort[0] == column:
+            label += " ↓" if self._cluster_sort[1] else " ↑"
+        return label
+
     def _tree_selected(self, event: tk.Event | None = None) -> None:
         selection = self.cluster_tree.selection()
         if selection and int(selection[0]) != self.selected_cluster:
@@ -966,6 +1009,16 @@ class ClusterApp:
         except tk.TclError:
             return
         self.root.iconphoto(True, self._icon)
+
+
+def _cluster_sort_key(raw: str, iid: str) -> tuple[int, int]:
+    """Numeric column value, then the cluster index, so equal counts stay stable."""
+
+    try:
+        value = int(raw)
+    except ValueError:
+        value = 0
+    return (value, int(iid))
 
 
 def _openable_file(directory: Path, item: TimestampedFile, cluster_name: str) -> Path | None:

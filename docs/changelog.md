@@ -17,6 +17,7 @@ This file records user-visible changes to File Name Cluster. Versions follow sem
 - Retina/high-DPI scaling was added. The app opens in a normal window rather than fullscreen. The packaged macOS app declares high-resolution capability.
 - Calendar, timeline, pattern-table, metadata fallback, folder-opening, file-opening, and display behavior have automated coverage. UI tests keep Tk windows withdrawn.
 - The Options tab includes a read-only table of every field in `filenamecluster-model.json`: `learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, and `learned.separated`. Values match the file. A folder with no fitted boundary shows `null`.
+- The cluster list sorts by event number (`#`) or by file count (`Files`). Click a heading to sort, and click it again to reverse the direction; ↑ and ↓ show which way. The events with the most files are the major ones: sort `Files` downward to bring them to the top.
 
 ### Changed
 

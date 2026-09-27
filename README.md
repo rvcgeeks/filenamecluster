@@ -14,7 +14,7 @@ The metadata reader is implemented with the Python standard library. It supports
   <img src="docs/assets/main-ui.png" alt="Clusters tab: timeline, calendar, event list, and day detail">
 </p>
 
-The Clusters tab. The timeline is the whole folder, to scale. The calendar colours each day by its event. The day detail is that day from 00:00 to 24:00.
+The Clusters tab. The timeline is the whole folder, to scale. The calendar colours each day by its event. The day detail is that day from 00:00 to 24:00. The cluster list sorts by event number (`#`) or by file count (`Files`): click a heading, then click it again to reverse the order. ↑ and ↓ show the direction. The events with the most files are the major ones, so sorting `Files` downward brings those to the top.
 
 ## Documents
 
