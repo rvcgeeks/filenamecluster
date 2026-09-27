@@ -2,11 +2,11 @@
 
 Rajas Chavadekar (rvchavadekar@gmail.com)
 
-A folder is one sequence of capture times. The only observation used from file $i$ is its filename timestamp $t_i$. Image bytes are not a variable in this model.
+A folder is one sequence of capture times. The only observation used by the clustering model from file $i$ is its timestamp $t_i$. The filename is tried first. If it has no timestamp, the metadata reader may supply only the capture time from a recognised picture or video, or the CreationDate from a PDF. Pixels, location, camera details, document contents, and filesystem dates are not variables in this model.
 
 Line numbers below are the current source under `filenamecluster/src/filenamecluster/core/`.
 
-> **In simple words.** Imagine a big box of photos. Every photo has a little clock written in its name, like `IMG_20240101_101500.jpg`, which means “1 January 2024, 10:15:00”. This app only reads that clock. It never looks at the picture itself, so it does not know if the photo shows a cat, a cake, or a beach.
+> **In simple words.** Imagine a big box of photos, videos, and PDFs. A file may have a little clock written in its name, like `IMG_20240101_101500.jpg`, which means “1 January 2024, 10:15:00”. The app tries that clock first. If the name has none, it can read only the capture-time field from recognised picture or video metadata, or the creation date from PDF metadata. It never looks at pixels or document contents, so it does not know what a file shows or says.
 >
 > The job is to put the photos into small piles called **events**. One event is one outing: a birthday party, a trip to the park, a wedding. Photos taken close together in time go in the same pile. When there is a long quiet time with no photos, a new pile starts.
 >
@@ -79,7 +79,7 @@ split(g, model, F, C):
 
 This algorithm was not chosen in a vacuum. The useful solution had to satisfy all of these constraints at once:
 
-1. **Use filenames only.** The available observation is a timestamp parsed from a filename. The program must not decode image or video bytes, inspect EXIF, use GPS, use faces or objects, or fall back to filesystem creation and modification dates.
+1. **Use timestamps only.** The preferred observation is a timestamp parsed from a filename. If the name has none, a standard-library reader may extract only the capture time from recognised image or video metadata, or CreationDate from a PDF. The program must not decode pixels or document contents, use GPS, camera details, faces or objects, scan arbitrary files for metadata, or fall back to filesystem creation and modification dates.
 2. **Work for different shooting habits.** One person may take hundreds of photographs per day; another may leave several days between photographs from the same trip. One universal gap such as 12 or 24 hours cannot fit both.
 3. **Keep chronological events contiguous.** After sorting by time, an event must be one uninterrupted interval. This is segmentation of a sequence, not arbitrary clustering where photo 1 and photo 100 can join while the photos between them do not.
 4. **Be deterministic and explainable.** The same names and settings must produce the same folders. The learned boundary must be visible as a number that can be explained and audited.
@@ -88,7 +88,7 @@ This algorithm was not chosen in a vacuum. The useful solution had to satisfy al
 7. **Accept later batches.** Existing event folders and newly copied files must be put back into one chronological sequence. With enough evidence the model should refit; without enough evidence it should reuse the last boundary.
 8. **Scale linearly after sorting.** Thousands of files should be ordinary work. The algorithm should not compare every file with every other file.
 
-The filename-only requirement is the most restrictive one. A human can see that two photos show the same birthday cake. This program cannot. It can only see that their clocks are close. Therefore this is a **temporal event segmenter**, not a semantic understanding system.
+The timestamp-only requirement is the most restrictive one. A human can see that two photos show the same birthday cake. This program cannot. It can only see that their clocks are close. Therefore this is a **temporal event segmenter**, not a semantic understanding system.
 
 ### Why not just use a fixed number?
 
@@ -128,7 +128,7 @@ This adapts to the overall pace, but the constant $k$ is still universal. It ass
 
 **A change-point model.** A Bayesian or dynamic-programming change-point method could model local changes in shooting rate. It is more flexible but requires more assumptions, penalties, and implementation machinery. For this application, every possible boundary already has one direct observation—the adjacent time gap—so that complexity is difficult to justify.
 
-**Visual or location clustering.** Image embeddings, GPS, faces, colour, and EXIF would often improve semantic quality. They directly violate the input and privacy requirements here.
+**Visual or location clustering.** Image embeddings, GPS, faces, colour, and non-time metadata would often improve semantic quality. They directly violate the input and privacy requirements here. EXIF is used only as a fallback source for its capture-time tag.
 
 ### Why two Gaussians on log gaps?
 
@@ -170,13 +170,13 @@ This project did **not** invent temporal photo-event clustering. The core idea�
 
 **Kodak event clustering.** Kodak's [US 6,606,411](https://patents.google.com/patent/US6606411B1/en) describes computing time differences between adjacent pictures, scaling or compressing large differences, making a time-difference histogram, and using two-means clustering to separate small and large gaps. That is very close in purpose. This implementation differs in its exact model: individual log gaps rather than a binned scaled histogram, a two-Gaussian mixture fitted with EM rather than two-means, an equal-posterior boundary, and explicit safety and incremental-reuse rules. Those are engineering and statistical choices, not evidence that the broad idea is new.
 
-**Microsoft PhotoTOC.** Platt, Czerwinski, and Field's 2002 [PhotoTOC technical report](https://www.microsoft.com/en-us/research/wp-content/uploads/2002/02/tr-2002-17.pdf) sorts photos by creation time and detects a boundary when a log gap is much larger than a local average of nearby log gaps. It used a local threshold with empirically chosen constants and also used colour to split large clusters. This project shares the log-gap insight but learns one folder-wide two-pattern distribution and never reads image content.
+**Microsoft PhotoTOC.** Platt, Czerwinski, and Field's 2002 [PhotoTOC technical report](https://www.microsoft.com/en-us/research/wp-content/uploads/2002/02/tr-2002-17.pdf) sorts photos by creation time and detects a boundary when a log gap is much larger than a local average of nearby log gaps. It used a local threshold with empirically chosen constants and also used colour to split large clusters. This project shares the log-gap insight but learns one folder-wide two-pattern distribution and never reads visual content.
 
 **Adobe Lightroom Classic.** Adobe documents [automatic stacking by capture time](https://helpx.adobe.com/lightroom-classic/help/auto-stack.html): users select time as a criterion and adjust a slider for the interval. Lightroom can also use visual similarity. Its time method is user-tuned stacking rather than a learned event boundary, and it reads normal photo metadata rather than timestamps specifically recovered from filenames.
 
 **Google Photos.** Google documents [Photo Stacks](https://blog.google/products-and-platforms/products/photos/google-photos-organization-updates-november-2023/) as grouping similar photos taken close together and selecting a top pick with AI. That solves burst and duplicate-like clutter rather than this project's broader outing segmentation. It can inspect visual content; this project intentionally cannot.
 
-**Apple Photos.** Apple's [Trips collections](https://support.apple.com/guide/photos/find-your-travel-photos-and-videos-phtacde28864/mac) group travel photos based on location data. That richer signal can recognize travel semantics that timestamps alone cannot. It also means the feature is not an equivalent filename-only local algorithm.
+**Apple Photos.** Apple's [Trips collections](https://support.apple.com/guide/photos/find-your-travel-photos-and-videos-phtacde28864/mac) group travel photos based on location data. That richer signal can recognize travel semantics that timestamps alone cannot. It also means the feature is not an equivalent timestamp-only local algorithm.
 
 **digiKam.** The digiKam manual documents a [timeline histogram](https://docs.digikam.org/en/left_sidebar/timeline_view.html) and [grouping by time](https://docs.digikam.org/en/main_window/image_view.html). Its time grouping is aimed at near-simultaneous shots and uses EXIF/XMP timestamps; its timeline supports date-range browsing. It is related workflow, not the same learned event model.
 
@@ -191,7 +191,7 @@ It depends on the comparison:
 - **Compared with consumer photo intelligence from Apple, Google, or Adobe:** no. Those systems can use pixels, embeddings, locations, faces, duplicate detection, quality scoring, and large trained models. They can answer semantic questions that timestamp gaps cannot.
 - **Compared with current research:** no. A two-component Gaussian mixture fitted by EM is standard statistical machinery. Applying it to log time gaps is sensible and useful, but not a new class of machine-learning algorithm.
 
-The honest description is: **an adaptive, privacy-preserving, filename-only temporal clustering tool with careful product safeguards**. Its strength is not state-of-the-art intelligence. Its strength is achieving useful, explainable event folders under unusually strict constraints—without reading the photographs, uploading them, or asking the user to tune the boundary by hand.
+The honest description is: **an adaptive, privacy-preserving, filename-first temporal clustering tool with careful product safeguards**. Its strength is not state-of-the-art intelligence. Its strength is achieving useful, explainable event folders under unusually strict constraints—without reading visual content, uploading files, or asking the user to tune the boundary by hand.
 
 ### What the letters mean
 
@@ -845,7 +845,7 @@ The fitted triple $(e^{\mu_w}, e^{\mu_b}, e^{\tau})$ and the flag $\mu_b-\mu_w \
 >
 > The numbers are saved with every digit the computer has, like `37.98317023002044`, not chopped to `37.98`. A model is only as good as its numbers, so nothing is thrown away.
 
-Code: the four fields are `GapModel` in `learn.py` lines 21–28, filled at lines 128–132. The write, with no rounding, is `_learned_document` in `model_file.py` lines 69–77, called from `save_model` at lines 46–52.
+Code: the four fields are `GapModel` in `learn.py`. The write, with no rounding, is `_learned_document` in the same module, called from `save_model`. The Options tab shows the same four fields, `learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, and `learned.separated`, in a read-only table. The numbers are formatted with `json.dumps`, so they match the file. When no boundary was fitted, each value is `null`.
 
 On a later scan the sequence is rebuilt from every timestamped file in the chosen folder and inside existing event folders, sorted again as one series. $\mathcal{U}$ is recomputed from that series.
 

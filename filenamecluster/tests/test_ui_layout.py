@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from filenamecluster.core.cluster import Cluster
 from filenamecluster.core.organize import name_clusters
 from filenamecluster.core.parse import TimestampedFile
-from filenamecluster.ui.calendar_view import month_weeks, shift_month, summarize_days
+from filenamecluster.ui.calendar import month_weeks, shift_month, summarize_days
 from filenamecluster.ui.layout import (
     MARGIN,
     MAX_WIDTH,

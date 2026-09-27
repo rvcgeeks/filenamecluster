@@ -62,13 +62,17 @@ def shift_month(year: int, month: int, delta: int) -> tuple[int, int]:
 
 
 class CalendarView(ttk.Frame):
-    """One month at a time. Clicking a day calls ``on_day(date)``."""
+    """One month at a time. Clicking a day calls ``on_day(date)``.
+
+    A double-click on the orange or yellow selection calls ``on_open(index)``.
+    """
 
     def __init__(
         self,
         master: tk.Misc,
         *,
         on_day: Callable[[date], None] | None = None,
+        on_open: Callable[[int], None] | None = None,
         fonts: dict | None = None,
     ) -> None:
         super().__init__(master)
@@ -79,6 +83,7 @@ class CalendarView(ttk.Frame):
         self.selected_day: date | None = None
         self.selected_cluster: int | None = None
         self._on_day = on_day
+        self._on_open = on_open
         fonts = fonts or {}
         self._small = fonts.get("small")
         self._bold = fonts.get("bold")
@@ -99,8 +104,8 @@ class CalendarView(ttk.Frame):
 
         self.canvas = tk.Canvas(
             self,
-            width=420,
-            height=300,
+            width=theme.px(420),
+            height=theme.px(300),
             background=theme.SURFACE,
             highlightthickness=1,
             highlightbackground=theme.BORDER,
@@ -110,6 +115,7 @@ class CalendarView(ttk.Frame):
         self.rowconfigure(1, weight=1)
         self.canvas.bind("<Configure>", lambda event: self.redraw())
         self.canvas.bind("<Button-1>", self._clicked)
+        self.canvas.bind("<Double-Button-1>", self._double)
         self.redraw()
 
     def set_clusters(self, clusters: Sequence[NamedCluster]) -> None:
@@ -163,16 +169,17 @@ class CalendarView(ttk.Frame):
         canvas.delete("all")
         self._cells = {}
         self.title.configure(text=f"{t(f'month_{self.month}')} {self.year}")
-        width = max(canvas.winfo_width(), 420)
-        height = max(canvas.winfo_height(), 300)
+        header = theme.px(HEADER_HEIGHT)
+        width = max(canvas.winfo_width(), theme.px(420))
+        height = max(canvas.winfo_height(), theme.px(300))
         weeks = month_weeks(self.year, self.month)
         cell_w = width / 7
-        cell_h = (height - HEADER_HEIGHT) / len(weeks)
+        cell_h = (height - header) / len(weeks)
 
         for column in range(7):
             canvas.create_text(
                 column * cell_w + cell_w / 2,
-                HEADER_HEIGHT / 2,
+                header / 2,
                 text=t(f"wd_short_{column}"),
                 fill=theme.MUTED,
                 font=self._small,
@@ -182,9 +189,9 @@ class CalendarView(ttk.Frame):
             for column, day in enumerate(week):
                 box = (
                     column * cell_w,
-                    HEADER_HEIGHT + row * cell_h,
+                    header + row * cell_h,
                     (column + 1) * cell_w,
-                    HEADER_HEIGHT + (row + 1) * cell_h,
+                    header + (row + 1) * cell_h,
                 )
                 self._cells[day] = box
                 self._draw_cell(day, box)
@@ -212,8 +219,8 @@ class CalendarView(ttk.Frame):
             width=3 if chosen else 1,
         )
         self.canvas.create_text(
-            x0 + 6,
-            y0 + 5,
+            x0 + theme.px(6),
+            y0 + theme.px(5),
             anchor="nw",
             text=str(day.day),
             fill=theme.TEXT if in_month else theme.BORDER,
@@ -223,12 +230,17 @@ class CalendarView(ttk.Frame):
             return
         number = self.clusters[info.cluster].number
         self.canvas.create_text(
-            x1 - 5, y0 + 5, anchor="ne", text=f"#{number}", fill=theme.ACCENT_ACTIVE, font=self._small
+            x1 - theme.px(5),
+            y0 + theme.px(5),
+            anchor="ne",
+            text=f"#{number}",
+            fill=theme.ACCENT_ACTIVE,
+            font=self._small,
         )
         if info.files:
             self.canvas.create_text(
-                x0 + 6,
-                y1 - 5,
+                x0 + theme.px(6),
+                y1 - theme.px(5),
                 anchor="sw",
                 text=file_count(info.files),
                 fill=theme.TEXT,
@@ -239,3 +251,14 @@ class CalendarView(ttk.Frame):
         day = self.day_at(event.x, event.y)
         if day is not None and self._on_day:
             self._on_day(day)
+
+    def _double(self, event: tk.Event) -> None:
+        """Open the folder for the orange or yellow selection."""
+
+        day = self.day_at(event.x, event.y)
+        if day is None or self._on_open is None:
+            return
+        info = self.days.get(day)
+        if info is None or info.cluster is None or info.cluster != self.selected_cluster:
+            return
+        self._on_open(info.cluster)

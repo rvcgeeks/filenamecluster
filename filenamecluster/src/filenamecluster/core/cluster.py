@@ -16,8 +16,7 @@ import math
 from dataclasses import dataclass
 from datetime import timedelta
 
-from filenamecluster.core.learn import GapModel, fit_gap_model
-from filenamecluster.core.model_file import FolderModel
+from filenamecluster.core.learn import FolderModel, GapModel, fit_gap_model
 from filenamecluster.core.parse import TimestampedFile
 
 

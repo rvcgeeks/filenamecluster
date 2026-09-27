@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.parse import TimestampPatterns, parse_timestamp, scan_directory
+from filenamecluster.core.parse import PatternRule, TimestampPatterns, parse_timestamp, scan_directory
 from filenamecluster.core.pipeline import cluster_directory
 
 
@@ -32,6 +32,7 @@ class ParseTimestampTests(unittest.TestCase):
             "InShot_20240127_220124404.mp4": datetime(2024, 1, 27, 22, 1, 24, 404000),
             "Project_12_02_2023-12-03-01-32-06.mp4": datetime(2023, 12, 3, 1, 32, 6),
             "IMG-20240530-WA0014.jpg": datetime(2024, 5, 30, 0, 0, 0),
+            "VID-20240530-WA0015.mp4": datetime(2024, 5, 30, 0, 0, 0),
             "photo_2024-05-30.jpg": datetime(2024, 5, 30, 0, 0, 0),
             "IMG_20160229_100000.jpg": datetime(2016, 2, 29, 10, 0, 0),
         }
@@ -219,6 +220,22 @@ class PatternOptionTests(unittest.TestCase):
             date_only="",
         )
         self.assertIsNone(parse_timestamp("202401011015009999", patterns))
+
+    def test_an_extra_rule_is_used_alongside_the_built_in_ones(self):
+        extra = PatternRule(
+            "",
+            "Shot prefix",
+            r"shot(?P<y>\d{4})(?P<mo>\d{2})(?P<d>\d{2})(?P<h>\d{2})(?P<mi>\d{2})(?P<s>\d{2})",
+        )
+        patterns = TimestampPatterns(rules=TimestampPatterns().rules + (extra,))
+        self.assertEqual(
+            parse_timestamp("shot20240301120000.jpg", patterns),
+            datetime(2024, 3, 1, 12, 0, 0),
+        )
+        self.assertEqual(
+            parse_timestamp("IMG_20240101_101500.jpg", patterns),
+            datetime(2024, 1, 1, 10, 15, 0),
+        )
 
 
 if __name__ == "__main__":

@@ -57,7 +57,7 @@ jobs:
 
       - name: Build the executable
         working-directory: filenamecluster
-        run: uv run build
+        run: uv run python build.py
 
       - name: Name the download
         id: bundle

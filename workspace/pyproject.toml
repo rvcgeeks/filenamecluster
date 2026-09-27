@@ -1,16 +1,17 @@
 [project]
 name = "workspace"
-version = "0.1.0"
+version = "0.1.1"
 description = "Run filenamecluster on a folder of files and build the event folders."
 authors = [{ name = "Rajas Chavadekar", email = "rvchavadekar@gmail.com" }]
 requires-python = ">=3.11"
 dependencies = ["filenamecluster"]
 
 [project.urls]
-Readme = "../readme.md"
+Readme = "../README.md"
 Algorithm = "../docs/algorithm.md"
 Architecture = "../docs/architecture.md"
 Devops = "../docs/devops.md"
+Changelog = "../docs/changelog.md"
 
 [project.scripts]
 stub = "stub:main"

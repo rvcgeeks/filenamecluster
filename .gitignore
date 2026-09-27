@@ -12,4 +12,5 @@
 **/dist/
 **/*.spec
 
-workspace/data/
+workspace/data/**
+!workspace/data/.gitkeep

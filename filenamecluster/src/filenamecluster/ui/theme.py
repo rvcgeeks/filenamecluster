@@ -5,6 +5,8 @@ Author: Rajas Chavadekar (rvchavadekar@gmail.com). Design: ``docs/architecture.m
 
 from __future__ import annotations
 
+import ctypes
+import sys
 import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import ttk
@@ -28,6 +30,9 @@ GRID_MAJOR = "#a9cce3"
 GRID_MINOR = "#e3f0fa"
 FILE_MARK = "#2e86c1"
 
+
+# 1.0 until ``sharpen`` sees a display that Tk is painting too coarsely for.
+UI_SCALE = 1.0
 
 _LATIN_FAMILY: str | None = None
 _SCRIPT_FACES: dict[str, tuple[str, ...]] = {
@@ -65,6 +70,109 @@ _SCRIPT_FACES: dict[str, tuple[str, ...]] = {
 _SCRIPT_FACES["mr"] = _SCRIPT_FACES["hi"]
 
 
+def px(value: float) -> int:
+    """A layout length, grown when text is rasterised above 1x."""
+
+    return max(1, int(round(value * UI_SCALE)))
+
+
+def prepare_process_dpi() -> None:
+    """Tell Windows to report the real monitor DPI before the window exists."""
+
+    if sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except (AttributeError, OSError, ValueError):
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except (AttributeError, OSError, ValueError):
+            return
+
+
+def enter_fullscreen(root: tk.Misc) -> None:
+    """Fill the screen on the machine that opened the window."""
+
+    try:
+        root.attributes("-fullscreen", True)
+    except tk.TclError:
+        try:
+            root.state("zoomed")
+        except tk.TclError:
+            return
+
+
+def sharpen(root: tk.Misc) -> None:
+    """Rasterise text at the display scale when Tk is still painting at 1x.
+
+    On a Retina Mac, Tk often reports about 72 dpi while the screen is 2x,
+    and the window server stretches that bitmap. Matching ``tk scaling`` to
+    the screen scale draws the glyphs with enough pixels to stay readable.
+    """
+
+    global UI_SCALE
+    backing = _backing_scale()
+    try:
+        current = float(root.tk.call("tk", "scaling"))
+    except (tk.TclError, TypeError, ValueError):
+        current = 1.0
+    if backing > current + 0.2:
+        try:
+            root.tk.call("tk", "scaling", backing)
+        except tk.TclError:
+            UI_SCALE = 1.0
+            return
+        UI_SCALE = backing / max(current, 0.1)
+    else:
+        UI_SCALE = 1.0
+
+
+def _backing_scale() -> float:
+    if sys.platform == "darwin":
+        return _mac_backing_scale()
+    if sys.platform == "win32":
+        return _windows_backing_scale()
+    return 1.0
+
+
+def _mac_backing_scale() -> float:
+    try:
+        import ctypes.util
+
+        objc = ctypes.cdll.LoadLibrary(ctypes.util.find_library("objc"))
+        objc.objc_getClass.restype = ctypes.c_void_p
+        objc.objc_getClass.argtypes = [ctypes.c_char_p]
+        objc.sel_registerName.restype = ctypes.c_void_p
+        objc.sel_registerName.argtypes = [ctypes.c_char_p]
+        send_ptr = ctypes.cast(
+            objc.objc_msgSend,
+            ctypes.CFUNCTYPE(ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p),
+        )
+        send_double = ctypes.cast(
+            objc.objc_msgSend,
+            ctypes.CFUNCTYPE(ctypes.c_double, ctypes.c_void_p, ctypes.c_void_p),
+        )
+        screen = send_ptr(objc.objc_getClass(b"NSScreen"), objc.sel_registerName(b"mainScreen"))
+        if not screen:
+            return 1.0
+        scale = float(send_double(screen, objc.sel_registerName(b"backingScaleFactor")))
+    except (AttributeError, OSError, ValueError):
+        return 1.0
+    if scale < 1.0:
+        return 1.0
+    return scale
+
+
+def _windows_backing_scale() -> float:
+    try:
+        dpi = int(ctypes.windll.user32.GetDpiForSystem())
+    except (AttributeError, OSError, ValueError):
+        return 1.0
+    if dpi <= 0:
+        return 1.0
+    return max(dpi / 96.0, 1.0)
+
+
 def use_script(root: tk.Misc, fonts: dict[str, tkfont.Font], code: str) -> None:
     """Use a face that can draw Hindi, Marathi, Japanese, or Korean."""
 
@@ -85,6 +193,7 @@ def use_script(root: tk.Misc, fonts: dict[str, tkfont.Font], code: str) -> None:
 def apply(root: tk.Misc) -> dict[str, tkfont.Font]:
     """Style ``root`` and return the extra fonts the app uses."""
 
+    sharpen(root)
     base = tkfont.nametofont("TkDefaultFont")
     fonts = {
         "title": base.copy(),
@@ -127,7 +236,12 @@ def apply(root: tk.Misc) -> dict[str, tkfont.Font]:
     style.configure("Status.TLabel", background=PANEL, foreground=TEXT, padding=(10, 4))
     style.configure("Error.TLabel", background=PANEL, foreground=ERROR, padding=(10, 4))
 
-    style.configure("TButton", background=SURFACE, padding=(12, 5), bordercolor=BORDER)
+    style.configure(
+        "TButton",
+        background=SURFACE,
+        padding=(px(12), px(5)),
+        bordercolor=BORDER,
+    )
     style.map(
         "TButton",
         background=[("pressed", BORDER), ("active", PANEL)],
@@ -139,7 +253,7 @@ def apply(root: tk.Misc) -> dict[str, tkfont.Font]:
         foreground=SURFACE,
         bordercolor=ACCENT_ACTIVE,
         font=fonts["bold"],
-        padding=(16, 6),
+        padding=(px(16), px(6)),
     )
     style.map(
         "Accent.TButton",
@@ -160,7 +274,7 @@ def apply(root: tk.Misc) -> dict[str, tkfont.Font]:
     )
     style.configure("TSpinbox", arrowcolor=ACCENT, fieldbackground=SURFACE)
     style.configure("TNotebook", background=BACKGROUND, bordercolor=BORDER)
-    style.configure("TNotebook.Tab", background=PANEL, padding=(16, 6))
+    style.configure("TNotebook.Tab", background=PANEL, padding=(px(16), px(6)))
     style.map(
         "TNotebook.Tab",
         background=[("selected", SURFACE)],
@@ -170,7 +284,7 @@ def apply(root: tk.Misc) -> dict[str, tkfont.Font]:
         "Treeview",
         background=SURFACE,
         fieldbackground=SURFACE,
-        rowheight=24,
+        rowheight=int(fonts["bold"].metrics("linespace")) + px(8),
         bordercolor=BORDER,
     )
     style.configure("Treeview.Heading", background=PANEL, font=fonts["bold"])

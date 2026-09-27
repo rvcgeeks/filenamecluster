@@ -1,6 +1,6 @@
 """Build a native executable for the operating system this command runs on.
 
-PyInstaller cannot cross-compile. ``uv run build`` makes a Mac app on a Mac,
+PyInstaller cannot cross-compile. ``uv run python build.py`` makes a Mac app on a Mac,
 a Linux binary on Linux, and a Windows binary on Windows.
 
 Author: Rajas Chavadekar (rvchavadekar@gmail.com).
@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     args = [arg for arg in args if arg != "--no-cleanup"]
     if args:
         print(
-            "uv run build makes an executable for this computer only.\n"
+            "uv run python build.py makes an executable for this computer only.\n"
             "PyInstaller cannot cross-compile, so there is no Windows, Mac, or Linux option.\n"
             "Run the same command on the system you want a binary for.\n"
             "Pass --no-cleanup to keep the analysis files in pyinstaller/.",
@@ -78,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
     completed = subprocess.run(command, cwd=ROOT, check=False)
     if completed.returncode != 0:
         return completed.returncode
+    _enable_retina_app()
     print(f"Built for {sys.platform} in {ROOT / 'dist'}")
     if keep_analysis:
         print(f"Analysis kept in {ANALYSIS}")
@@ -90,6 +91,19 @@ def main(argv: list[str] | None = None) -> int:
         shutil.rmtree(extra)
         print("Removed dist/filenamecluster; the Mac app is dist/filenamecluster.app.")
     return 0
+
+
+def _enable_retina_app() -> None:
+    """Draw the frozen Mac app at the screen's pixel density."""
+
+    plist_path = ROOT / "dist" / "filenamecluster.app" / "Contents" / "Info.plist"
+    if not plist_path.is_file():
+        return
+    import plistlib
+
+    info = plistlib.loads(plist_path.read_bytes())
+    info["NSHighResolutionCapable"] = True
+    plist_path.write_bytes(plistlib.dumps(info))
 
 
 def _bundled_files() -> list[tuple[Path, str]]:

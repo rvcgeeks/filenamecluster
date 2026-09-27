@@ -1,5 +1,6 @@
-"""Drive the real window with a hidden Tk root."""
+"""Drive the widgets with a Tk root that is never mapped onto the screen."""
 
+import json
 import tkinter as tk
 import unittest
 from datetime import date, datetime
@@ -24,10 +25,36 @@ PHOTOS = (
 
 
 def make_root() -> tk.Tk:
+    """A Tk interpreter whose window stays withdrawn for the whole test.
+
+    Creating ``Tk`` can map a window before Python runs the next line, so this
+    withdraws it immediately and ignores later requests to show, zoom, or fill
+    the screen. Tests still build the real widgets. They do not present them.
+    """
+
     try:
         root = tk.Tk()
     except tk.TclError as exc:
         raise unittest.SkipTest(f"no display for Tk: {exc}")
+    root.withdraw()
+    real_attributes = root.attributes
+    real_state = root.state
+
+    def attributes(*args):
+        if len(args) >= 2 and args[0] == "-fullscreen" and args[1]:
+            return ""
+        return real_attributes(*args)
+
+    def state(value=None):
+        if value is None:
+            return real_state()
+        if value != "withdrawn":
+            return real_state()
+        return real_state(value)
+
+    root.attributes = attributes
+    root.state = state
+    root.deiconify = lambda: None
     root.withdraw()
     return root
 
@@ -47,6 +74,7 @@ class AppTests(unittest.TestCase):
     def tearDown(self):
         set_language("en")
         theme.use_script(self.root, self.app.fonts, "en")
+        self.assertEqual(self.root.state(), "withdrawn")
         self.root.destroy()
         self.tmp.cleanup()
 
@@ -123,15 +151,18 @@ class AppTests(unittest.TestCase):
 
     def test_pattern_options_are_editable(self):
         self.app.load_folder(self.folder)
-        self.assertIn("(?P<y>", self.app.pattern_vars["clock_compact_sep"].get())
+        self.assertIn("(?P<y>", self.app.pattern_tree.set("clock_compact_sep", "pattern"))
+        self.assertEqual(self.app.pattern_tree.set("clock_separated", "description"), "Dashed clock")
         self.assertEqual(self.app.limit_vars["min_year"].get(), 1990)
         self.assertEqual(self.app.limit_vars["prec_clock"].get(), 30)
 
-        self.app.pattern_vars["clock_separated"].set("(")
+        self.app.pattern_tree.set("clock_separated", "pattern", "(")
         self.assertFalse(self.app.refresh())
         self.assertIn("Dashed clock", self.app.status_text.get())
 
-        self.app.pattern_vars["clock_separated"].set(TimestampPatterns().clock_separated)
+        self.app.pattern_tree.set(
+            "clock_separated", "pattern", TimestampPatterns().clock_separated
+        )
         self.app.limit_vars["min_year"].set(2100)
         self.app.limit_vars["max_year"].set(1990)
         self.assertFalse(self.app.refresh())
@@ -151,18 +182,50 @@ class AppTests(unittest.TestCase):
         self.assertEqual(len(self.app.result.clusters), 2)
         self.assertEqual(self.app.limit_vars["min_year"].get(), 1990)
 
-        for key in self.app.pattern_vars:
-            self.app.pattern_vars[key].set("")
-        self.app.pattern_vars["clock_compact_14"].set(
-            r"shot(?P<y>\d{4})(?P<mo>\d{2})(?P<d>\d{2})(?P<h>\d{2})(?P<mi>\d{2})(?P<s>\d{2})"
+        for iid in self.app.pattern_tree.get_children():
+            self.app.pattern_tree.set(iid, "pattern", "")
+        self.app.pattern_tree.set(
+            "clock_compact_14",
+            "pattern",
+            r"shot(?P<y>\d{4})(?P<mo>\d{2})(?P<d>\d{2})(?P<h>\d{2})(?P<mi>\d{2})(?P<s>\d{2})",
         )
         (self.folder / "shot20240301120000.jpg").write_bytes(b"z")
         self.assertTrue(self.app.refresh())
         names = [item.name for cluster in self.app.result.clusters for item in cluster.files]
         self.assertEqual(names, ["shot20240301120000.jpg"])
 
-        self.assertEqual(self.app._scroll_options(SimpleNamespace(delta=120)), "break")
-        self.assertEqual(self.app._scroll_options(SimpleNamespace(delta=-120)), "break")
+        before = self.app.pattern_tree.get_children()
+        self.app.add_pattern_rule()
+        added = [iid for iid in self.app.pattern_tree.get_children() if iid not in before]
+        self.assertEqual(len(added), 1)
+        self.assertEqual(self.app.pattern_tree.set(added[0], "description"), "Custom pattern")
+        self.app.pattern_tree.selection_set(added[0])
+        self.app.remove_pattern_rule()
+        self.assertNotIn(added[0], self.app.pattern_tree.get_children())
+
+        self.assertEqual(str(self.app.options_rows.cget("orient")), "vertical")
+        self.assertEqual(str(self.app.options_columns.cget("orient")), "horizontal")
+        self.assertEqual(len(self.app.options_rows.panes()), 2)
+        self.assertEqual(len(self.app.options_columns.panes()), 3)
+        limits = self.app.root.nametowidget(self.app.options_columns.panes()[1])
+        limits.event_generate("<Configure>", width=520, height=400)
+        hints = [
+            child
+            for child in limits.winfo_children()
+            if str(child.cget("style")) == "Muted.TLabel"
+        ]
+        self.assertEqual(int(hints[0].cget("wraplength")), 492)
+        patterns = self.app.root.nametowidget(self.app.options_rows.panes()[0])
+        patterns.event_generate("<Configure>", width=420, height=300)
+        self.assertEqual(int(patterns.winfo_children()[0].cget("wraplength")), 400)
+        self.app._place_equal_columns(self.app.options_columns.winfo_width() or 900)
+        widths = [
+            int(self.app.options_columns.paneconfigure(pane_id, "width")[-1])
+            for pane_id in self.app.options_columns.panes()
+        ]
+        self.assertEqual(widths[0], widths[1])
+        self.assertEqual(widths[1], widths[2])
+        self.assertGreater(widths[0], 0)
 
     def test_tighter_options_split_more(self):
         self.app.load_folder(self.folder)
@@ -182,6 +245,44 @@ class AppTests(unittest.TestCase):
         self.assertNotIn("splits", text)
         self.assertNotIn("merges", text)
         self.assertNotIn("note", text)
+
+    def test_options_model_view_matches_the_json_and_stays_read_only(self):
+        self.assertEqual(
+            [self.app.model_tree.set(row, "value") for row in self.app.model_tree.get_children()],
+            ["—", "—", "—", "—"],
+        )
+        self.assertEqual(self.app.model_tree.bind("<Double-1>"), "")
+        self.app.load_folder(self.folder)
+        raw = json.loads((self.folder / "filenamecluster-model.json").read_text(encoding="utf-8"))
+        self.assertIsNone(raw["learned"])
+        self.assertEqual(
+            [self.app.model_tree.set(row, "value") for row in ("within_hours", "between_hours", "boundary_hours", "separated")],
+            ["null", "null", "null", "null"],
+        )
+
+        rich = self.folder / "rich"
+        rich.mkdir()
+        for name in (
+            "IMG_20240101_100000.jpg",
+            "IMG_20240101_140000.jpg",
+            "IMG_20240101_200000.jpg",
+            "IMG_20240102_040000.jpg",
+            "IMG_20240104_040000.jpg",
+            "IMG_20240107_040000.jpg",
+            "IMG_20240111_040000.jpg",
+        ):
+            (rich / name).write_bytes(b"x")
+        self.app.load_folder(rich)
+        learned = json.loads((rich / "filenamecluster-model.json").read_text(encoding="utf-8"))["learned"]
+        self.assertIsNotNone(learned)
+        for key in ("within_hours", "between_hours", "boundary_hours"):
+            self.assertEqual(self.app.model_tree.set(key, "parameter"), f"learned.{key}")
+            self.assertEqual(self.app.model_tree.set(key, "value"), json.dumps(learned[key]))
+        self.assertEqual(
+            self.app.model_tree.set("separated", "value"),
+            "true" if learned["separated"] else "false",
+        )
+        self.assertIsNone(self.app._pattern_editor)
 
     def test_unreadable_folder_is_reported(self):
         self.assertFalse(self.app.load_folder(self.folder / "missing"))
@@ -338,6 +439,7 @@ class WidgetTests(unittest.TestCase):
     def tearDown(self):
         set_language("en")
         theme.use_script(self.root, self.app.fonts, "en")
+        self.assertEqual(self.root.state(), "withdrawn")
         self.root.destroy()
         self.tmp.cleanup()
 
@@ -382,10 +484,14 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(self.app.apply_button.cget("text"), "Apply clustering")
         self.app.language_var.set("Deutsch")
         self.app._language_changed()
+        self.assertEqual(self.app.pattern_tree.set("date_only", "description"), t("pattern_date_only"))
+        self.assertEqual(self.app.model_tree.heading("meaning")["text"], t("col_meaning"))
+        self.assertEqual(self.app.model_tree.set("boundary_hours", "meaning"), t("model_boundary"))
         self.assertEqual(self.app.apply_button.cget("text"), t("apply"))
         self.assertNotEqual(self.app.apply_button.cget("text"), "Apply clustering")
         self.app.language_var.set("English")
         self.app._language_changed()
+        self.assertEqual(self.app.pattern_tree.set("date_only", "description"), "Date only")
         self.assertEqual(self.app.apply_button.cget("text"), "Apply clustering")
         self.assertIn("Flatten clustering", self.app.about_text.get("1.0", "end"))
 
@@ -419,6 +525,159 @@ class WidgetTests(unittest.TestCase):
             day_view._clicked(SimpleNamespace(x=0, y=0))
 
 
+class FolderOpenTests(unittest.TestCase):
+    def setUp(self):
+        set_language("en")
+        self.root = make_root()
+        self.app = ClusterApp(self.root)
+        self.tmp = TemporaryDirectory()
+        self.folder = Path(self.tmp.name)
+        for name in PHOTOS:
+            (self.folder / name).write_bytes(b"x")
+        self.app.load_folder(self.folder)
+
+    def tearDown(self):
+        set_language("en")
+        self.assertEqual(self.root.state(), "withdrawn")
+        self.root.destroy()
+        self.tmp.cleanup()
+
+    def test_double_click_reports_a_missing_event_folder(self):
+        self.app.select_cluster(0)
+        with patch.object(app_module.messagebox, "showwarning") as warn:
+            self.app.open_cluster_folder(0)
+        warn.assert_called_once()
+        title, body = warn.call_args[0][:2]
+        self.assertEqual(title, "Cannot open this event")
+        self.assertIn("does not exist yet", body)
+        self.assertIn(self.app.result.clusters[0].name, body)
+
+        with (
+            patch.object(self.app.overview.canvas, "gettags", return_value=("bar", "c0")),
+            patch.object(app_module, "open_folder_window") as opener,
+            patch.object(app_module.messagebox, "showwarning") as warn,
+        ):
+            self.app.overview._double(SimpleNamespace(x=1, y=1))
+        opener.assert_not_called()
+        warn.assert_called_once()
+
+        day = self.app.result.clusters[0].start.date()
+        x0, y0, x1, y1 = self.app.calendar._cells[day]
+        with patch.object(app_module.messagebox, "showwarning") as warn:
+            self.app.calendar._double(SimpleNamespace(x=(x0 + x1) / 2, y=(y0 + y1) / 2))
+        warn.assert_called_once()
+
+        with (
+            patch.object(self.app.cluster_tree, "identify_row", return_value="0"),
+            patch.object(app_module.messagebox, "showwarning") as warn,
+        ):
+            self.app._tree_double(SimpleNamespace(y=10))
+        warn.assert_called_once()
+
+    def test_double_click_opens_an_existing_event_folder(self):
+        with (
+            patch.object(app_module.messagebox, "askyesno", return_value=True),
+            patch.object(app_module.messagebox, "showinfo"),
+        ):
+            self.app.apply_clustering()
+        folder = self.folder / self.app.result.clusters[0].name
+        self.assertTrue(folder.is_dir())
+        self.app.select_cluster(0)
+        with patch.object(app_module, "open_folder_window") as opener:
+            self.app.open_cluster_folder(0)
+            with patch.object(self.app.overview.canvas, "gettags", return_value=("bar", "c0")):
+                self.app.overview._double(SimpleNamespace(x=1, y=1))
+            with patch.object(self.app.overview.canvas, "gettags", return_value=("bar", "c1")):
+                self.app.overview._double(SimpleNamespace(x=1, y=1))
+        self.assertEqual(opener.call_count, 2)
+        self.assertEqual(opener.call_args_list[0].args[0], folder)
+
+    def test_double_click_in_day_detail_opens_the_file(self):
+        name = "IMG_20240101_100000.jpg"
+        self.app.show_day(date(2024, 1, 1))
+        with (
+            patch.object(self.app.day_tree, "identify_row", return_value="0"),
+            patch.object(app_module, "open_file") as opener,
+        ):
+            self.app._day_file_double(SimpleNamespace(y=10))
+        opener.assert_called_once_with(self.folder / name)
+
+        with (
+            patch.object(app_module.messagebox, "askyesno", return_value=True),
+            patch.object(app_module.messagebox, "showinfo"),
+        ):
+            self.app.apply_clustering()
+        placed = self.folder / self.app.result.clusters[0].name / name
+        self.assertTrue(placed.is_file())
+        with (
+            patch.object(self.app.day_tree, "identify_row", return_value="0"),
+            patch.object(app_module, "open_file") as opener,
+        ):
+            self.app._day_file_double(SimpleNamespace(y=10))
+        opener.assert_called_once_with(placed)
+
+        placed.unlink()
+        with (
+            patch.object(self.app.day_tree, "identify_row", return_value="0"),
+            patch.object(app_module, "open_file") as opener,
+            patch.object(app_module.messagebox, "showwarning") as warn,
+        ):
+            self.app._day_file_double(SimpleNamespace(y=10))
+            self.app._day_file_double(SimpleNamespace(y=10))
+        opener.assert_not_called()
+        self.assertEqual(warn.call_args[0][0], "Cannot open this file")
+
+        with (
+            patch.object(self.app.day_tree, "identify_row", return_value=""),
+            patch.object(app_module, "open_file") as opener,
+        ):
+            self.app._day_file_double(SimpleNamespace(y=10))
+        opener.assert_not_called()
+
+
+class OpenFileTests(unittest.TestCase):
+    def test_each_platform_uses_its_default_opener(self):
+        path = Path("photo.jpg")
+        with (
+            patch.object(app_module.sys, "platform", "darwin"),
+            patch.object(app_module.subprocess, "Popen") as popen,
+        ):
+            app_module.open_file(path)
+        popen.assert_called_once_with(["open", "photo.jpg"])
+        with (
+            patch.object(app_module.sys, "platform", "win32"),
+            patch.object(app_module.os, "startfile", create=True) as start,
+        ):
+            app_module.open_file(path)
+        start.assert_called_once_with("photo.jpg")
+        with (
+            patch.object(app_module.sys, "platform", "linux"),
+            patch.object(app_module.subprocess, "Popen") as popen,
+        ):
+            app_module.open_file(path)
+        popen.assert_called_once_with(["xdg-open", "photo.jpg"])
+
+
+class DisplayTests(unittest.TestCase):
+    def test_fullscreen_falls_back_when_the_window_cannot_fill_the_screen(self):
+        root = SimpleNamespace()
+
+        def attributes(*_args):
+            raise tk.TclError("no")
+
+        def state(*_args):
+            raise tk.TclError("no")
+
+        root.attributes = attributes
+        root.state = state
+        theme.enter_fullscreen(root)
+
+    def test_windows_dpi_helpers_are_best_effort(self):
+        with patch.object(theme.sys, "platform", "win32"):
+            theme.prepare_process_dpi()
+            self.assertGreaterEqual(theme._backing_scale(), 1.0)
+
+
 class MainTests(unittest.TestCase):
     def test_main_builds_the_app_and_runs_the_loop(self):
         root = make_root()
@@ -428,6 +687,7 @@ class MainTests(unittest.TestCase):
         ):
             self.assertEqual(app_module.main(), 0)
         loop.assert_called_once()
+        self.assertEqual(root.state(), "withdrawn")
         root.destroy()
 
 

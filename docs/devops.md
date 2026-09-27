@@ -4,7 +4,7 @@ Rajas Chavadekar (rvchavadekar@gmail.com)
 
 A release is a numbered snapshot of the program, plus three files people can download. You pick the number, put a tag on that commit, and push the tag. GitHub Actions builds the program and puts the files on a Release page, each with its own download link.
 
-Nothing is sent to PyPI. The downloadable files live only on the GitHub Release.
+Nothing is sent to PyPI. The downloadable files live only on the GitHub Release. User-visible changes for each version are recorded in [changelog.md](changelog.md); update it before tagging a release.
 
 ## The words
 
@@ -21,18 +21,18 @@ Nothing is sent to PyPI. The downloadable files live only on the GitHub Release.
 
 Do this from the project root, on the `main` branch, after the tests pass.
 
-1. Set the version in `filenamecluster/pyproject.toml`:
+1. Update `docs/changelog.md`, then set the version in `filenamecluster/pyproject.toml`:
 
    ```toml
    version = "0.1.1"
    ```
 
-   Use three numbers: `major.minor.patch`. A fix bumps the last number (`0.1.0` to `0.1.1`). A new feature bumps the middle number and sets the last back to zero (`0.2.0`). A breaking change bumps the first (`1.0.0`).
+   Use three numbers: `major.minor.patch`. A fix or compatible feature release bumps the last number (`0.1.0` to `0.1.1`). A larger feature release bumps the middle number and sets the last back to zero (`0.2.0`). A breaking change bumps the first (`1.0.0`).
 
 2. Commit that change and push `main`.
 
    ```bash
-   git add filenamecluster/pyproject.toml
+   git add docs/changelog.md filenamecluster/pyproject.toml filenamecluster/uv.lock
    git commit -m "Set version to 0.1.1."
    git push origin main
    ```
@@ -92,7 +92,7 @@ Each build does this:
 3. Installs [uv](https://docs.astral.sh/uv/) and the locked dependencies from `filenamecluster/uv.lock`.
 4. On Linux, installs the small libraries Tk needs to open a window.
 5. Checks that Python can `import tkinter`.
-6. Runs `uv run build`. That is PyInstaller. It cannot build a Windows program on Linux, so each job builds only for the computer it is on.
+6. Runs `uv run python build.py`. That is PyInstaller. It cannot build a Windows program on Linux, so each job builds only for the computer it is on.
    - Windows: one file, `dist/filenamecluster.exe`
    - Linux: one file, `dist/filenamecluster`
    - Mac: `dist/filenamecluster.app`. The app is a folder, which is what macOS expects. PyInstaller will not pack a windowed Mac app into one file.

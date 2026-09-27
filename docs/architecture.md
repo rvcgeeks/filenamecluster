@@ -6,21 +6,22 @@ The mathematics of the boundary is in [algorithm.md](algorithm.md). This file is
 
 ## High-level design
 
-File Name Cluster is a desktop app. A person picks one folder. The app reads capture times out of filenames, learns one event boundary for that folder, draws the events, and, on confirmation, moves files into one folder per event. A later batch dropped into the same folder is clustered together with the files already filed.
+File Name Cluster is a desktop app. A person picks one folder. The app reads capture times from filenames and, when a name has none, from recognised picture, video, or PDF metadata. It learns one event boundary for that folder, draws the events, and, on confirmation, moves files into one folder per event. A later batch dropped into the same folder is clustered together with the files already filed.
 
-Nothing in that path opens an image. The model file `filenamecluster-model.json` sits in the chosen folder, visible, and stores the last fitted boundary at full precision.
+When a filename has no capture time, only that time is read from the picture or video container, or from PDF CreationDate metadata; pixels, GPS, camera details, document contents, and filesystem dates are not read. Unsupported files and files with unreadable capture times are skipped. The model file `filenamecluster-model.json` sits in the chosen folder, visible, and stores the last fitted boundary at full precision. It is written by `learn`.
 
 ```mermaid
 flowchart LR
     person["Person"] --> ui["ui.ClusterApp"]
     ui --> pipe["core.pipeline"]
     pipe --> parse["core.parse"]
-    pipe --> model["core.model_file"]
+    pipe --> exif["core.exif"]
     pipe --> cluster["core.cluster"]
-    cluster --> learn["core.learn"]
+    pipe --> learn["core.learn"]
+    cluster --> learn
     ui --> org["core.organize"]
     parse --> folder["Chosen folder"]
-    model --> folder
+    learn --> folder
     org --> folder
     ui --> views["Timeline, calendar, day detail"]
 ```
@@ -89,17 +90,17 @@ flowchart TB
 | `ui` | Window, options, drawing, confirmation | The decision of where an event boundary is |
 | `pipeline` | One scan turned into a `ClusterResult` | Moving bytes |
 | `parse` | Filename clocks, year window, top-level listing plus event-folder listing | Clustering |
-| `learn` | The mixture and the boundary $\tau$ | Files, folders, Tk |
+| `learn` | The mixture, the boundary $\tau$, and the visible JSON | Tk, moving files |
 | `cluster` | Safety limits and the join-or-split rule | How a folder is named |
 | `organize` | Chronological folder names, move, flatten | The fit |
-| `model_file` | Reading and writing the visible JSON | Deciding $\tau$ |
+| `exif` | Capture time stored in a picture, video, or PDF. A file with no readable time is skipped | Filenames, clustering |
 
 ## Class diagram
 
 ```mermaid
 classDiagram
     class TimestampPatterns {
-        +clock and date expressions
+        +rules: PatternRule[]
         +min_year
         +max_year
         +prec_clock
@@ -108,9 +109,14 @@ classDiagram
         +compile() CompiledTimestampPatterns
     }
     class CompiledTimestampPatterns {
-        +compiled expressions
+        +compiled rules
         +year window
         +priorities
+    }
+    class PatternRule {
+        +key
+        +description
+        +pattern
     }
     class TimestampedFile {
         +name: str
@@ -172,6 +178,7 @@ classDiagram
     class DayInfo
 
     TimestampPatterns --> CompiledTimestampPatterns : compile
+    TimestampPatterns --> PatternRule
     FolderContents --> TimestampedFile : scan yields
     Cluster --> TimestampedFile
     NamedCluster --|> Cluster : same files, plus number and name
@@ -201,7 +208,7 @@ classDiagram
 sequenceDiagram
     participant App as ClusterApp
     participant Pipe as cluster_directory
-    participant Model as model_file
+    participant Model as learn
     participant Scan as scan_directory
     participant Parse as parse_timestamp
     participant Fit as cluster_files
@@ -214,7 +221,10 @@ sequenceDiagram
     Scan-->>Pipe: loose files, other folders, files inside event folders
     loop each filename
         Pipe->>Parse: name, compiled patterns
-        Parse-->>Pipe: timestamp or skip
+        Parse-->>Pipe: timestamp or none
+        alt filename has no timestamp
+            Pipe->>Pipe: read picture/video capture time
+        end
     end
     Pipe->>Fit: timestamped files, params, saved model
     Fit->>Learn: log gaps strictly between floor and ceiling
@@ -227,9 +237,11 @@ sequenceDiagram
 
 Inside `cluster_files` the steps are exactly those in [algorithm.md](algorithm.md): sort, form $g_i$, build $\mathcal{U}$, fit or reuse, then walk the gaps once.
 
-Inside `parse_timestamp`, every enabled expression is tried. A match produces a candidate `(priority, start index, datetime)`. The highest priority wins. A tie keeps the earlier match in the name. A blank expression is off. A clock needs groups `y, mo, d, h, mi, s`. A day-month clock needs `a, b, y, h, mi`. An epoch needs `ms` and is converted with `datetime.fromtimestamp`. A date-only stamp is local midnight. Years outside the window are rejected.
+Inside `parse_timestamp`, every enabled rule is tried. A match produces a candidate `(priority, start index, datetime)`. The highest priority wins. A tie keeps the earlier match in the name. A blank expression is off. A clock needs groups `y, mo, d, h, mi, s`. A day-month clock needs `a, b, y, h, mi`. An epoch needs `ms` and is converted with `datetime.fromtimestamp`. A date-only stamp is local midnight. Years outside the window are rejected. The Options tab presents these rules as a table of descriptions and expressions; users can add and remove custom rows.
 
-`scan_directory` lists the chosen folder only one level down. A subdirectory whose name matches an event folder is opened, and only its immediate files are taken. Any other subdirectory is recorded and not entered. `filenamecluster-model.json` is never treated as a photo.
+If filename parsing returns no timestamp, `core.exif` first checks the container signature. Recognised still images are JPEG, PNG, WebP, TIFF, and HEIF/AVIF. Recognised videos are MP4, MOV, M4V, 3GP, and AVI. An embedded EXIF `DateTimeOriginal` is preferred; a video can otherwise use its `mvhd` or `IDIT` creation time. A recognised PDF uses its Info-dictionary `CreationDate` or XMP `CreateDate`. Reads are bounded to the PDF head and tail. The reader is standard-library-only and never deep-scans an arbitrary file. Failure returns `None`, and `pipeline` records that file in `ignored_without_timestamp`.
+
+`scan_directory` lists the chosen folder only one level down. A subdirectory whose name matches an event folder is opened, and only its immediate files are taken. Any other subdirectory is recorded and not entered. `filenamecluster-model.json` is never treated as media.
 
 ### Apply
 
@@ -289,10 +301,16 @@ The package splits along the three jobs the work actually has.
 
 **Put the events on disk and on screen.** `organize` knows the folder-name grammar and the move rules. `pipeline` is the one function the window calls to go from a path to a `ClusterResult`, and it is also the function that writes the JSON. `ui` draws that result and asks before `organize` moves anything.
 
-The window is one `ClusterApp` on one `tk.Tk`. The timeline and the calendar share cluster indices. Clicking a bar, a calendar day, or a row selects the same event. The timeline scale is in `layout.TimeScale`: one day is a constant number of pixels, so a gap on screen is the gap in time. Zoom changes that constant. The calendar colours a day by the event that owns it.
+The window is one `ClusterApp` on one `tk.Tk`. The timeline and the calendar share cluster indices. Clicking a bar, a calendar day, or a row selects the same event. Double-clicking the selected orange or yellow event opens its existing folder in a separate file-manager window; a missing folder produces a localised warning. Double-clicking a Day detail row resolves the file's current loose or event-folder path and asks the operating system to open it with the default application. The timeline scale is in `layout.TimeScale`: one day is a constant number of pixels, so a gap on screen is the gap in time. Zoom changes that constant. The calendar colours a day by the event that owns it.
 
-Options are not a second clustering mode. They are the inputs of the same functions: `ClusterParams.floor`, `ClusterParams.ceiling`, and the fields of `TimestampPatterns`. Restore defaults writes the built-in values back into the widgets and refreshes.
+Options are not a second clustering mode. They are the inputs of the same functions: `ClusterParams.floor`, `ClusterParams.ceiling`, and the fields of `TimestampPatterns`. Restore defaults writes the built-in values back into the widgets and refreshes. The tab keeps filename patterns across the top. Below that, a horizontal split holds three resizable columns: safety limits, the year window, and the read-only model table. The horizontal sash sets how tall the pattern row is. The two vertical sashes set the column widths. Every pane stretches when the window grows. There is no scrolling column of stacked sections.
+
+The same tab shows a read-only table of `filenamecluster-model.json`. The rows are `learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, and `learned.separated`. Values come from `ClusterResult.model` after a preview, formatted with `json.dumps` so the digits match the file. `true`, `false`, and `null` are the JSON literals. Before a folder is chosen the cells show an em dash. The table has no editor. A language change refreshes the headings and the meaning column.
+
+`main` enables process DPI awareness before creating Tk, sharpens Tk scaling against the display backing scale, and requests fullscreen after constructing the app. The packaged macOS app also declares high-resolution capability. Tests use withdrawn Tk roots and suppress requests that could map a test window.
 
 Failure stays local. An unreadable folder sets the status line. A move that would overwrite stops and reports `FileExistsError` or `OSError`. A model file that cannot be written is skipped; the preview still appears. A model file that is not valid JSON, or whose `learned` object is missing fields, loads as no saved boundary.
+
+The calendar implementation is `ui/calendar.py`; the former `calendar_view.py` name no longer exists. Model persistence lives in `core/learn.py`; there is no separate `model_file.py`. The only build driver is `filenamecluster/build.py`, beside `pyproject.toml`.
 
 The icon shown by the window is `filenamecluster/src/filenamecluster/ui/assets/icon.svg`, rasterized to `icon.png` beside it because Tk’s `PhotoImage` loads the PNG.

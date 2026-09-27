@@ -1,22 +1,20 @@
 [project]
 name = "filenamecluster"
-version = "0.1.0"
-description = "Tkinter app that clusters camera-roll files into chronological events using the timestamp embedded in each name."
+version = "0.1.1"
+description = "Tkinter app that clusters camera-roll files into chronological events using the timestamp in each filename, or picture, video, or PDF creation metadata when the name has none."
 authors = [{ name = "Rajas Chavadekar", email = "rvchavadekar@gmail.com" }]
 requires-python = ">=3.11"
 dependencies = []
 
 [project.urls]
-Readme = "../readme.md"
+Readme = "../README.md"
 Algorithm = "../docs/algorithm.md"
 Architecture = "../docs/architecture.md"
 Devops = "../docs/devops.md"
+Changelog = "../docs/changelog.md"
 
 [project.gui-scripts]
 filenamecluster = "filenamecluster.ui.app:main"
-
-[project.scripts]
-build = "filenamecluster.build:main"
 
 [dependency-groups]
 dev = [

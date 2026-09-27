@@ -7,28 +7,33 @@ Design: ``docs/architecture.md``.
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
 import tkinter as tk
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from filenamecluster.core.cluster import ClusterParams
-from filenamecluster.core.model_file import MODEL_NAME
+from filenamecluster.core.learn import MODEL_NAME
 from filenamecluster.core.organize import (
+    _source_path,
     flatten_cluster_folders,
     is_cluster_folder_name,
     move_into_cluster_folders,
 )
 from filenamecluster.core.parse import (
     LIMIT_FIELDS,
-    PATTERN_FIELDS,
+    PatternRule,
     TimestampPatterns,
     TimestampedFile,
 )
 from filenamecluster.core.pipeline import ClusterResult, cluster_directory
 from filenamecluster.ui import theme
 from filenamecluster.ui.about import sections
-from filenamecluster.ui.calendar_view import CalendarView
+from filenamecluster.ui.calendar import CalendarView
 from filenamecluster.ui.i18n import LANGUAGES, file_count, language, set_language, t
 from filenamecluster.ui.timeline import TimelineView
 
@@ -38,17 +43,6 @@ OPTIONS = (
     ("floor", "floor_label", "floor_hint", (0.5, 168, 0.5)),
     ("ceiling", "ceiling_label", "ceiling_hint", (1, 8760, 1)),
 )
-
-_PATTERN_TEXT = {
-    "clock_separated": ("pattern_clock_separated", "groups_clock_ms"),
-    "clock_compact_sep": ("pattern_clock_compact_sep", "groups_clock_ms"),
-    "clock_compact_17": ("pattern_clock_compact_17", "groups_clock_ms"),
-    "clock_compact_14": ("pattern_clock_compact_14", "groups_clock"),
-    "numeric_date": ("pattern_numeric_date", "groups_day_month"),
-    "epoch_ms": ("pattern_epoch_ms", "groups_epoch"),
-    "date_only": ("pattern_date_only", "groups_date"),
-}
-
 
 def _hours(delta: timedelta) -> float:
     return delta.total_seconds() / 3600
@@ -61,7 +55,9 @@ class ClusterApp:
         self.root = root
         self.fonts = theme.apply(root)
         self._bound: list[ttk.Widget] = []
-        self._pattern_hints: list[tuple[ttk.Label, str, str]] = []
+        self._pattern_desc_dirty: set[str] = set()
+        self._pattern_editor: ttk.Entry | None = None
+        self._custom_pattern_seq = 1
         self._tab_keys: list[str] = []
         self._headings: list[tuple[ttk.Treeview, tuple[tuple[str, str], ...]]] = []
         self._status_builder = lambda: (t("choose_status"), False)
@@ -83,10 +79,6 @@ class ClusterApp:
         pattern_defaults = TimestampPatterns()
         self.limit_vars = {
             key: tk.IntVar(root, getattr(pattern_defaults, key)) for key, *_rest in LIMIT_FIELDS
-        }
-        self.pattern_vars = {
-            key: tk.StringVar(root, getattr(pattern_defaults, key))
-            for key, *_rest in PATTERN_FIELDS
         }
         self.folder_text = tk.StringVar(root, t("no_folder"))
         self.status_text = tk.StringVar(root, t("choose_status"))
@@ -151,6 +143,7 @@ class ClusterApp:
             placeholder=t("placeholder_timeline"),
             on_select=self.select_cluster,
             on_time=self._timeline_clicked,
+            on_open=self.open_cluster_folder,
             fonts=self.fonts,
         )
         self.overview.pack(fill="x")
@@ -159,7 +152,12 @@ class ClusterApp:
         panes.pack(fill="both", expand=True, pady=(10, 0))
 
         calendar_frame = self._text(ttk.LabelFrame(panes, padding=8), "calendar")
-        self.calendar = CalendarView(calendar_frame, on_day=self._day_clicked, fonts=self.fonts)
+        self.calendar = CalendarView(
+            calendar_frame,
+            on_day=self._day_clicked,
+            on_open=self.open_cluster_folder,
+            fonts=self.fonts,
+        )
         self.calendar.pack(fill="both", expand=True)
         panes.add(calendar_frame, weight=3)
 
@@ -169,6 +167,7 @@ class ClusterApp:
             (("number", "col_number", 50, "e"), ("name", "col_folder", 320, "w"), ("files", "col_files", 60, "e")),
         )
         self.cluster_tree.bind("<<TreeviewSelect>>", self._tree_selected)
+        self.cluster_tree.bind("<Double-1>", self._tree_double)
         panes.add(list_frame, weight=3)
 
         self.day_frame = self._text(ttk.LabelFrame(panes, padding=8), "day_detail")
@@ -177,6 +176,7 @@ class ClusterApp:
             height=90,
             placeholder=t("placeholder_day"),
             on_select=lambda index: self.select_cluster(index, show_day=False),
+            on_open=self.open_cluster_folder,
             fonts=self.fonts,
         )
         self.day_view.pack(fill="x")
@@ -184,70 +184,103 @@ class ClusterApp:
             self.day_frame,
             (("time", "col_time", 80, "w"), ("name", "col_file", 280, "w"), ("event", "col_event", 60, "e")),
         )
+        self.day_tree.bind("<Double-1>", self._day_file_double)
         panes.add(self.day_frame, weight=4)
 
     def _build_options_tab(self) -> None:
         tab = ttk.Frame(self.notebook, padding=(10, 10, 10, 6))
         self._add_tab(tab, "tab_options")
-        canvas = tk.Canvas(tab, background=theme.BACKGROUND, highlightthickness=0)
-        bar = ttk.Scrollbar(tab, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=bar.set)
-        bar.pack(side="right", fill="y")
-        canvas.pack(side="top", fill="both", expand=True)
-        inner = ttk.Frame(canvas, padding=(6, 4, 12, 8))
-        window = canvas.create_window((0, 0), window=inner, anchor="nw")
-        inner.bind("<Configure>", lambda event: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>", lambda event: canvas.itemconfigure(window, width=event.width))
-        canvas.bind("<MouseWheel>", self._scroll_options)
-        inner.bind("<MouseWheel>", self._scroll_options)
-        self.options_canvas = canvas
-
-        gaps = self._text(ttk.LabelFrame(inner, padding=14), "safety_limits")
-        gaps.pack(fill="x")
-        self.option_inputs: dict[str, ttk.Spinbox] = {}
-        for row, (key, label_key, hint_key, (low, high, step)) in enumerate(OPTIONS):
-            self.option_inputs[key] = self._option_row(
-                gaps, row, label_key, hint_key, self.option_vars[key], low, high, step
-            )
-
-        limits = self._text(ttk.LabelFrame(inner, padding=14), "years_frame")
-        limits.pack(fill="x", pady=(12, 0))
-        self.limit_inputs: dict[str, ttk.Spinbox] = {}
-        for row, (key, _label, _hint, low, high) in enumerate(LIMIT_FIELDS):
-            self.limit_inputs[key] = self._option_row(
-                limits, row, f"limit_{key}", f"limit_{key}_hint", self.limit_vars[key], low, high, 1
-            )
-
-        patterns = self._text(ttk.LabelFrame(inner, padding=14), "patterns_frame")
-        patterns.pack(fill="x", pady=(12, 0))
-        self._text(
-            ttk.Label(patterns, wraplength=860, style="Muted.TLabel"),
-            "patterns_help",
-        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 8))
-        self.pattern_inputs: dict[str, ttk.Entry] = {}
-        for row, (key, _label, example, _groups) in enumerate(PATTERN_FIELDS, start=1):
-            label_key, groups_key = _PATTERN_TEXT[key]
-            self._text(ttk.Label(patterns, style="Info.TLabel"), label_key).grid(
-                row=row, column=0, sticky="w", pady=4
-            )
-            entry = ttk.Entry(patterns, textvariable=self.pattern_vars[key])
-            entry.grid(row=row, column=1, sticky="ew", padx=12)
-            entry.bind("<Return>", lambda event: self.refresh())
-            self.pattern_inputs[key] = entry
-            hint = ttk.Label(patterns, style="Muted.TLabel")
-            hint.grid(row=row, column=2, sticky="w")
-            self._pattern_hints.append((hint, example, groups_key))
-            hint.configure(text=f"{example}  ·  {t(groups_key)}")
-        patterns.columnconfigure(1, weight=1)
+        self._options_user_sized = False
+        self._placing_columns = False
+        self._equal_columns_job: str | None = None
 
         buttons = ttk.Frame(tab)
-        buttons.pack(fill="x", pady=(8, 0))
+        buttons.pack(side="bottom", fill="x", pady=(8, 0))
         self._text(
             ttk.Button(buttons, style="Accent.TButton", command=self.refresh),
             "update_preview",
         ).pack(side="left")
         self._text(ttk.Button(buttons, command=self.restore_defaults), "restore_defaults").pack(
             side="left", padx=8
+        )
+
+        rows = self._split(tab, "vertical")
+        rows.pack(fill="both", expand=True)
+        self.options_rows = rows
+
+        patterns = self._text(ttk.LabelFrame(rows, padding=8), "patterns_frame")
+        self._flowing_help(patterns, "patterns_help")
+        self.pattern_tree = self._tree(
+            patterns,
+            (
+                ("description", "col_description", 180, "w"),
+                ("pattern", "col_pattern", 520, "w"),
+            ),
+        )
+        self.pattern_tree.configure(height=6)
+        self.pattern_tree.bind("<Double-1>", self._edit_pattern_cell)
+        self._fill_pattern_table(TimestampPatterns().rules)
+        pattern_buttons = ttk.Frame(patterns)
+        pattern_buttons.pack(anchor="w", pady=(6, 0))
+        self._text(ttk.Button(pattern_buttons, command=self.add_pattern_rule), "add_pattern").pack(
+            side="left"
+        )
+        self._text(
+            ttk.Button(pattern_buttons, command=self.remove_pattern_rule), "remove_pattern"
+        ).pack(side="left", padx=8)
+        rows.add(patterns, stretch="always", minsize=160)
+
+        columns = self._split(rows, "horizontal")
+        self.options_columns = columns
+        rows.add(columns, stretch="always", minsize=160)
+
+        gaps = self._text(ttk.LabelFrame(columns, padding=8), "safety_limits")
+        self.option_inputs: dict[str, ttk.Spinbox] = {}
+        for row, (key, label_key, hint_key, (low, high, step)) in enumerate(OPTIONS):
+            self.option_inputs[key] = self._option_row(
+                gaps, row, label_key, hint_key, self.option_vars[key], low, high, step
+            )
+        self._reflow(gaps)
+        columns.add(gaps, stretch="always", minsize=160, width=240, sticky="nsew")
+
+        limits = self._text(ttk.LabelFrame(columns, padding=8), "years_frame")
+        self.limit_inputs: dict[str, ttk.Spinbox] = {}
+        for row, (key, _label, _hint, low, high) in enumerate(LIMIT_FIELDS):
+            self.limit_inputs[key] = self._option_row(
+                limits, row, f"limit_{key}", f"limit_{key}_hint", self.limit_vars[key], low, high, 1
+            )
+        self._reflow(limits)
+        columns.add(limits, stretch="always", minsize=160, width=240, sticky="nsew")
+
+        model = self._text(ttk.LabelFrame(columns, padding=8), "model_frame")
+        self._flowing_help(model, "model_help")
+        self.model_tree = self._tree(
+            model,
+            (
+                ("parameter", "col_parameter", 140, "w"),
+                ("value", "col_value", 110, "w"),
+                ("meaning", "col_meaning", 160, "w"),
+            ),
+        )
+        self.model_tree.configure(height=4)
+        self._fill_model_view()
+        columns.add(model, stretch="always", minsize=160, width=240, sticky="nsew")
+
+        columns.bind("<Configure>", self._balance_options_grid)
+        columns.bind("<ButtonPress-1>", self._mark_columns_user_sized, add="+")
+
+    def _split(self, master: tk.Misc, orient: str) -> tk.PanedWindow:
+        """A sash the user can drag. Every pane grows when the window grows."""
+
+        return tk.PanedWindow(
+            master,
+            orient=orient,
+            sashwidth=6,
+            sashrelief="flat",
+            opaqueresize=True,
+            background=theme.BORDER,
+            bd=0,
+            handlesize=0,
         )
 
     def _option_row(
@@ -261,20 +294,109 @@ class ClusterApp:
         high: float,
         step: float,
     ) -> ttk.Spinbox:
-        self._text(ttk.Label(frame, style="Info.TLabel"), label_key).grid(
-            row=row, column=0, sticky="w", pady=6
-        )
+        line = row * 2
+        self._text(
+            ttk.Label(frame, style="Info.TLabel", wraplength=200, justify="left"),
+            label_key,
+        ).grid(row=line, column=0, sticky="ew", pady=(4, 0))
         spin = ttk.Spinbox(
             frame, from_=low, to=high, increment=step, width=8, textvariable=variable
         )
-        spin.grid(row=row, column=1, sticky="w", padx=12)
+        spin.grid(row=line, column=1, sticky="e", padx=(8, 0))
         spin.bind("<Return>", lambda event: self.refresh())
-        self._text(ttk.Label(frame, style="Muted.TLabel"), hint_key).grid(row=row, column=2, sticky="w")
+        self._text(
+            ttk.Label(frame, style="Muted.TLabel", wraplength=160, justify="left"),
+            hint_key,
+        ).grid(row=line + 1, column=0, columnspan=2, sticky="ew", pady=(0, 4))
+        frame.columnconfigure(0, weight=1)
         return spin
 
-    def _scroll_options(self, event: tk.Event) -> str:
-        self.options_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
-        return "break"
+    def _reflow(self, frame: ttk.LabelFrame) -> None:
+        """Wrap hint text to the pane width as the sash moves."""
+
+        def fit(event: tk.Event, frame: ttk.LabelFrame = frame) -> None:
+            width = event.width - 28
+            if width < 80:
+                return
+            for child in frame.winfo_children():
+                style = str(child.cget("style"))
+                if style == "Muted.TLabel":
+                    target = width
+                elif style == "Info.TLabel":
+                    target = max(width - 96, 80)
+                else:
+                    continue
+                if abs(int(child.cget("wraplength")) - target) < 4:
+                    continue
+                child.configure(wraplength=target)
+
+        frame.bind("<Configure>", fit)
+
+    def _flowing_help(self, frame: ttk.LabelFrame, key: str) -> None:
+        label = self._text(
+            ttk.Label(frame, style="Muted.TLabel", wraplength=280, justify="left"),
+            key,
+        )
+        label.pack(anchor="w", fill="x", pady=(0, 6))
+
+        def fit(event: tk.Event, label: ttk.Label = label) -> None:
+            width = event.width - 20
+            if width >= 80 and abs(int(label.cget("wraplength")) - width) >= 4:
+                label.configure(wraplength=width)
+
+        frame.bind("<Configure>", fit, add="+")
+
+    def _mark_columns_user_sized(self, event: tk.Event) -> None:
+        """A sash drag should stick. Later window resizes must not snap it back."""
+
+        if self._placing_columns or self.options_columns.winfo_width() < 200:
+            return
+        for index in range(2):
+            sash_x, _sash_y = self.options_columns.sash_coord(index)
+            if abs(event.x - sash_x) <= 8:
+                self._options_user_sized = True
+                return
+
+    def _balance_options_grid(self, event: tk.Event) -> None:
+        """Keep scheduling an even split until the row has its real width."""
+
+        if self._options_user_sized or self._placing_columns or event.width < 200:
+            return
+        if self._equal_columns_job is not None:
+            return
+        self._equal_columns_job = self.root.after_idle(self._finish_equal_columns)
+
+    def _finish_equal_columns(self) -> None:
+        self._equal_columns_job = None
+        if self._options_user_sized:
+            return
+        width = self.options_columns.winfo_width()
+        if width < 200:
+            return
+        self._place_equal_columns(width)
+
+    def _place_equal_columns(self, width: int) -> None:
+        actual = self.options_columns.winfo_width()
+        if actual >= 200:
+            width = actual
+        sash = int(self.options_columns.cget("sashwidth"))
+        pane = max((width - 2 * sash) // 3, 1)
+        target = pane * 2 + sash
+        try:
+            current = self.options_columns.sash_coord(0)[0]
+            following = self.options_columns.sash_coord(1)[0]
+        except tk.TclError:
+            current = following = -1
+        if abs(current - pane) < 3 and abs(following - target) < 3:
+            return
+        self._placing_columns = True
+        try:
+            for child in self.options_columns.panes():
+                self.options_columns.paneconfigure(child, width=pane)
+            self.options_columns.sash_place(0, pane, 1)
+            self.options_columns.sash_place(1, target, 1)
+        finally:
+            self._placing_columns = False
 
     def _build_skipped_tab(self) -> None:
         tab = ttk.Frame(self.notebook, padding=10)
@@ -322,7 +444,12 @@ class ClusterApp:
         )
         for key, heading_key, width, anchor in columns:
             tree.heading(key, text=t(heading_key), anchor=anchor)
-            tree.column(key, width=width, anchor=anchor, stretch=key == "name")
+            tree.column(
+                key,
+                width=width,
+                anchor=anchor,
+                stretch=key in {"name", "pattern", "meaning", "parameter", "value"},
+            )
         self._headings.append((tree, tuple((key, heading_key) for key, heading_key, *_rest in columns)))
         bar = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=bar.set)
@@ -371,8 +498,13 @@ class ClusterApp:
             if not low <= value <= high:
                 raise ValueError(t("must_be_between", label=label, low=low, high=high))
             limits[key] = value
-        texts = {key: self.pattern_vars[key].get() for key, *_rest in PATTERN_FIELDS}
-        patterns = TimestampPatterns(**texts, **limits)
+        self._close_pattern_editor(save=True)
+        rules = []
+        for iid in self.pattern_tree.get_children():
+            description, pattern = self.pattern_tree.item(iid, "values")
+            key = "" if str(iid).startswith("custom-") else str(iid)
+            rules.append(PatternRule(key, str(description), str(pattern)))
+        patterns = TimestampPatterns(rules=tuple(rules), **limits)
         patterns.compile()
         return patterns
 
@@ -382,8 +514,7 @@ class ClusterApp:
         patterns = TimestampPatterns()
         for key, *_rest in LIMIT_FIELDS:
             self.limit_vars[key].set(getattr(patterns, key))
-        for key, *_rest in PATTERN_FIELDS:
-            self.pattern_vars[key].set(getattr(patterns, key))
+        self._fill_pattern_table(patterns.rules)
         self.refresh()
 
     def refresh(self) -> bool:
@@ -533,6 +664,7 @@ class ClusterApp:
             )
 
         self._fill_skipped(result)
+        self._fill_model_view()
 
         self.apply_button.configure(state="normal" if result.clusters else "disabled")
         clustered = any(is_cluster_folder_name(name) for name in result.ignored_directories)
@@ -585,14 +717,17 @@ class ClusterApp:
         self.root.title(t("app_title"))
         for widget in self._bound:
             widget.configure(text=t(widget._i18n_key))
-        for widget, example, groups_key in self._pattern_hints:
-            widget.configure(text=f"{example}  ·  {t(groups_key)}")
+        for iid in self.pattern_tree.get_children():
+            if str(iid).startswith("custom-") or iid in self._pattern_desc_dirty:
+                continue
+            self.pattern_tree.set(iid, "description", t(f"pattern_{iid}"))
         for index, key in enumerate(self._tab_keys):
             self.notebook.tab(index, text=t(key))
         for tree, columns in self._headings:
             for column, key in columns:
                 tree.heading(column, text=t(key))
         self._fill_about()
+        self._fill_model_view()
         self.overview.set_placeholder(t("placeholder_timeline"))
         self.overview.retranslate()
         self.day_view.set_placeholder(t("placeholder_day"))
@@ -621,6 +756,34 @@ class ClusterApp:
         )
         return t("day_heading", when=when, count=count)
 
+    def _fill_model_view(self) -> None:
+        """Show every field of the model JSON. The table cannot edit them."""
+
+        self.model_tree.delete(*self.model_tree.get_children())
+        model = self.result.model if self.result is not None else None
+        loaded = self.result is not None
+        fields = (
+            ("within_hours", "model_within"),
+            ("between_hours", "model_between"),
+            ("boundary_hours", "model_boundary"),
+            ("separated", "model_separated"),
+        )
+        for key, meaning_key in fields:
+            if not loaded:
+                value = t("model_value_pending")
+            elif model is None:
+                value = "null"
+            elif key == "separated":
+                value = "true" if model.separated else "false"
+            else:
+                value = json.dumps(getattr(model, key))
+            self.model_tree.insert(
+                "",
+                "end",
+                iid=key,
+                values=(f"learned.{key}", value, t(meaning_key)),
+            )
+
     def _fill_skipped(self, result: ClusterResult) -> None:
         self.skipped_tree.delete(*self.skipped_tree.get_children())
         for name in result.ignored_directories:
@@ -643,6 +806,129 @@ class ClusterApp:
             model=_describe_model(result.model),
         )
 
+    def open_day_file(self, row: int) -> None:
+        """Open one Day detail row with the operating system's default app."""
+
+        if self.directory is None or self.selected_day is None:
+            return
+        entries = self.files_by_day.get(self.selected_day, [])
+        if not 0 <= row < len(entries):
+            return
+        item, index = entries[row]
+        path = _openable_file(self.directory, item, self._cluster_name(index))
+        if path is None:
+            messagebox.showwarning(
+                t("file_missing_title"),
+                t("file_missing_body", name=item.name),
+                parent=self.root,
+            )
+            return
+        open_file(path)
+
+    def _cluster_name(self, index: int) -> str:
+        if self.result is None or not 0 <= index < len(self.result.clusters):
+            return ""
+        return self.result.clusters[index].name
+
+    def open_cluster_folder(self, index: int) -> None:
+        """Open the event folder in its own file-manager window when it exists."""
+
+        if self.directory is None or self.result is None:
+            return
+        if not 0 <= index < len(self.result.clusters):
+            return
+        cluster = self.result.clusters[index]
+        folder = self.directory / cluster.name
+        if folder.is_dir():
+            open_folder_window(folder)
+            return
+        messagebox.showwarning(
+            t("folder_missing_title"),
+            t("folder_missing_body", name=cluster.name),
+            parent=self.root,
+        )
+
+    def _fill_pattern_table(self, rules: tuple[PatternRule, ...]) -> None:
+        self._close_pattern_editor(save=False)
+        self.pattern_tree.delete(*self.pattern_tree.get_children())
+        self._pattern_desc_dirty.clear()
+        self._custom_pattern_seq = 1
+        for rule in rules:
+            iid = rule.key or f"custom-{self._custom_pattern_seq}"
+            if str(iid).startswith("custom-"):
+                self._custom_pattern_seq = max(self._custom_pattern_seq, int(str(iid).split("-", 1)[1]) + 1)
+            description = t(f"pattern_{rule.key}") if rule.key else rule.description
+            self.pattern_tree.insert("", "end", iid=iid, values=(description, rule.pattern))
+
+    def add_pattern_rule(self) -> None:
+        iid = f"custom-{self._custom_pattern_seq}"
+        self._custom_pattern_seq += 1
+        self.pattern_tree.insert("", "end", iid=iid, values=(t("custom_pattern"), ""))
+        self.pattern_tree.selection_set(iid)
+        self.pattern_tree.see(iid)
+        self._begin_pattern_edit(iid, "pattern")
+
+    def remove_pattern_rule(self) -> None:
+        self._close_pattern_editor(save=True)
+        for iid in self.pattern_tree.selection():
+            self._pattern_desc_dirty.discard(str(iid))
+            self.pattern_tree.delete(iid)
+
+    def _edit_pattern_cell(self, event: tk.Event) -> None:
+        row = self.pattern_tree.identify_row(event.y)
+        column = self.pattern_tree.identify_column(event.x)
+        if not row or column not in {"#1", "#2"}:
+            return
+        name = self.pattern_tree["columns"][int(column[1:]) - 1]
+        self._begin_pattern_edit(row, name)
+
+    def _begin_pattern_edit(self, iid: str, column: str) -> None:
+        self._close_pattern_editor(save=True)
+        tree = self.pattern_tree
+        bbox = tree.bbox(iid, column)
+        if not bbox:
+            return
+        x, y, width, height = bbox
+        entry = ttk.Entry(tree)
+        entry.insert(0, tree.set(iid, column))
+        entry.select_range(0, "end")
+        entry.place(x=x, y=y, width=max(width, 80), height=height)
+        entry.focus_set()
+        self._pattern_editor = entry
+
+        def commit(_event: tk.Event | None = None) -> None:
+            if self._pattern_editor is not entry:
+                return
+            self._pattern_editor = None
+            value = entry.get()
+            entry.destroy()
+            tree.set(iid, column, value)
+            if column == "description" and not str(iid).startswith("custom-"):
+                if value != t(f"pattern_{iid}"):
+                    self._pattern_desc_dirty.add(str(iid))
+                else:
+                    self._pattern_desc_dirty.discard(str(iid))
+
+        def cancel(_event: tk.Event | None = None) -> str:
+            if self._pattern_editor is entry:
+                self._pattern_editor = None
+                entry.destroy()
+            return "break"
+
+        entry.bind("<Return>", commit)
+        entry.bind("<FocusOut>", commit)
+        entry.bind("<Escape>", cancel)
+
+    def _close_pattern_editor(self, save: bool) -> None:
+        entry = self._pattern_editor
+        if entry is None:
+            return
+        if save:
+            entry.event_generate("<Return>")
+            return
+        self._pattern_editor = None
+        entry.destroy()
+
     def _tree_selected(self, event: tk.Event | None = None) -> None:
         selection = self.cluster_tree.selection()
         if selection and int(selection[0]) != self.selected_cluster:
@@ -657,6 +943,21 @@ class ClusterApp:
     def _timeline_clicked(self, when: datetime) -> None:
         self._day_clicked(when.date())
 
+    def _tree_double(self, event: tk.Event) -> None:
+        row = self.cluster_tree.identify_row(event.y)
+        if not row or not str(row).isdigit():
+            return
+        index = int(row)
+        if index != self.selected_cluster:
+            return
+        self.open_cluster_folder(index)
+
+    def _day_file_double(self, event: tk.Event) -> None:
+        row = self.day_tree.identify_row(event.y)
+        if not row or not str(row).isdigit():
+            return
+        self.open_day_file(int(row))
+
     def _install_icon(self) -> None:
         """Use the PNG raster of ``icon.svg``. Tk does not load SVG or ICO here."""
 
@@ -665,6 +966,63 @@ class ClusterApp:
         except tk.TclError:
             return
         self.root.iconphoto(True, self._icon)
+
+
+def _openable_file(directory: Path, item: TimestampedFile, cluster_name: str) -> Path | None:
+    """Where the file sits now, including an event folder created by Apply."""
+
+    try:
+        current = _source_path(directory, item, item.name)
+    except ValueError:
+        return None
+    if current.is_file():
+        return current
+    if not cluster_name:
+        return None
+    try:
+        placed = _source_path(
+            directory,
+            TimestampedFile(item.name, item.timestamp, source=f"{cluster_name}/{item.name}"),
+            item.name,
+        )
+    except ValueError:
+        return None
+    if placed.is_file():
+        return placed
+    return None
+
+
+def open_file(path: Path) -> None:
+    """Open ``path`` with the operating system's default application."""
+
+    target = str(Path(path))
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", target])
+    elif sys.platform == "win32":
+        os.startfile(target)
+    else:
+        subprocess.Popen(["xdg-open", target])
+
+
+def open_folder_window(path: Path) -> None:
+    """Open ``path`` in a new file-manager window."""
+
+    folder = str(Path(path))
+    if sys.platform == "darwin":
+        escaped = folder.replace("\\", "\\\\").replace('"', '\\"')
+        subprocess.Popen(
+            [
+                "osascript",
+                "-e",
+                f'tell application "Finder" to make new Finder window to (POSIX file "{escaped}")',
+                "-e",
+                'tell application "Finder" to activate',
+            ]
+        )
+    elif sys.platform == "win32":
+        subprocess.Popen(["explorer", folder])
+    else:
+        subprocess.Popen(["xdg-open", folder])
 
 
 def _describe_model(model) -> str:
@@ -682,7 +1040,10 @@ def _icon_path() -> Path:
 
 
 def main() -> int:
+    theme.prepare_process_dpi()
     root = tk.Tk()
-    ClusterApp(root)
+    app = ClusterApp(root)
+    theme.enter_fullscreen(root)
+    root.after_idle(app._finish_equal_columns)
     root.mainloop()
     return 0

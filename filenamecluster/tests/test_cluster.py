@@ -5,8 +5,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from filenamecluster.core.cluster import ClusterParams, cluster_files
-from filenamecluster.core.learn import fit_gap_model
-from filenamecluster.core.model_file import FolderModel
+from filenamecluster.core.learn import FolderModel, fit_gap_model
 from filenamecluster.core.parse import TimestampedFile
 
 
@@ -139,8 +138,7 @@ class ClusterFilesTests(unittest.TestCase):
         from tempfile import TemporaryDirectory
         from pathlib import Path
 
-        from filenamecluster.core.learn import GapModel
-        from filenamecluster.core.model_file import load_model, save_model
+        from filenamecluster.core.learn import GapModel, load_model, save_model
 
         learned = GapModel(
             within_hours=math.pi,

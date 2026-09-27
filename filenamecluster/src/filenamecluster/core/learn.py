@@ -1,4 +1,4 @@
-"""Learn an event boundary from timestamp gaps in one folder.
+"""Learn an event boundary from timestamp gaps, and keep that boundary on disk.
 
 Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 The derivation is ``docs/algorithm.md``.
@@ -7,12 +7,17 @@ Nothing here reads image bytes. Each gap is the time between two filenames.
 Short gaps and long gaps are treated as two patterns, fitted to this folder
 alone, and a pause becomes a new event when it looks more like the long
 pattern than the short one.
+
+The fitted boundary is written to ``filenamecluster-model.json`` beside the
+files, where it can be opened and inspected. It is not a hidden file.
 """
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
 _VARIANCE_FLOOR = 0.05
 _SEPARATION = 1.0
@@ -196,3 +201,64 @@ def _variance(values: list[float], center: float) -> float:
     if len(values) < 2:
         return _VARIANCE_FLOOR
     return sum((value - center) ** 2 for value in values) / len(values)
+
+
+MODEL_NAME = "filenamecluster-model.json"
+
+
+@dataclass(frozen=True, slots=True)
+class FolderModel:
+    """The boundary last written for one folder."""
+
+    learned: GapModel | None = None
+
+    def with_learned(self, learned: GapModel | None) -> FolderModel:
+        return FolderModel(learned)
+
+
+def model_path(directory: Path | str) -> Path:
+    return Path(directory) / MODEL_NAME
+
+
+def load_model(directory: Path | str) -> FolderModel:
+    """Load ``filenamecluster-model.json``, or an empty model when it is absent."""
+
+    path = model_path(directory)
+    if not path.is_file():
+        return FolderModel()
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return FolderModel(learned=_learned(raw.get("learned")))
+
+
+def save_model(directory: Path | str, model: FolderModel) -> Path:
+    """Write the model where the user can see it, and return that path."""
+
+    path = model_path(directory)
+    document = {"learned": _learned_document(model.learned)}
+    path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def _learned(raw: object) -> GapModel | None:
+    if not isinstance(raw, dict):
+        return None
+    try:
+        return GapModel(
+            within_hours=float(raw["within_hours"]),
+            between_hours=float(raw["between_hours"]),
+            boundary_hours=float(raw["boundary_hours"]),
+            separated=bool(raw["separated"]),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _learned_document(model: GapModel | None) -> dict | None:
+    if model is None:
+        return None
+    return {
+        "within_hours": model.within_hours,
+        "between_hours": model.between_hours,
+        "boundary_hours": model.boundary_hours,
+        "separated": model.separated,
+    }

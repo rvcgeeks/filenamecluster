@@ -10,24 +10,22 @@ skip. The clock in the filename is used, never the filesystem dates.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from filenamecluster.core.model_file import MODEL_NAME
+from filenamecluster.core.learn import MODEL_NAME
 
 # Higher wins when several stamps sit in one name. A camera-style
 # YYYYMMDD_HHMMSS beats a trailing epoch (often an export id) and a bare date.
-_CLOCK_GROUPS = frozenset({"y", "mo", "d", "h", "mi", "s"})
-_PATTERN_GROUPS = {
-    "clock_separated": _CLOCK_GROUPS,
-    "clock_compact_sep": _CLOCK_GROUPS,
-    "clock_compact_17": _CLOCK_GROUPS,
-    "clock_compact_14": _CLOCK_GROUPS,
-    "numeric_date": frozenset({"a", "b", "y", "h", "mi"}),
-    "epoch_ms": frozenset({"ms"}),
-    "date_only": frozenset({"y", "mo", "d"}),
-}
+# kind, groups that must be named, groups that may also be named
+_KIND_SPECS = (
+    ("clock", frozenset({"y", "mo", "d", "h", "mi", "s"}), frozenset({"ms"})),
+    ("numeric_date", frozenset({"a", "b", "y", "h", "mi"}), frozenset({"s"})),
+    ("epoch_ms", frozenset({"ms"}), frozenset()),
+    ("date_only", frozenset({"y", "mo", "d"}), frozenset()),
+)
 
 # key, label, example filename, named groups the expression must provide
 PATTERN_FIELDS = (
@@ -65,6 +63,52 @@ PATTERN_FIELDS = (
     ("date_only", "Date only", "IMG-20240101-WA0001", "y, mo, d"),
 )
 
+@dataclass(frozen=True, slots=True)
+class PatternRule:
+    """One filename expression. A blank ``pattern`` is turned off.
+
+    ``key`` identifies a built-in rule. A rule added in the table may use an
+    empty key. ``description`` is the label shown for that row.
+    """
+
+    key: str
+    description: str
+    pattern: str
+
+
+def _builtin_rules() -> tuple[PatternRule, ...]:
+    sources = {
+        "clock_separated": (
+            r"(?<!\d)(?P<y>\d{4})-(?P<mo>\d{2})-(?P<d>\d{2})-"
+            r"(?P<h>\d{2})-(?P<mi>\d{2})-(?P<s>\d{2})(?:-(?P<ms>\d{3}))?"
+        ),
+        "clock_compact_sep": (
+            r"(?<!\d)(?P<y>\d{4})(?P<mo>\d{2})(?P<d>\d{2})[_-]"
+            r"(?P<h>\d{2})(?P<mi>\d{2})(?P<s>\d{2})(?P<ms>\d{1,3})?(?!\d)"
+        ),
+        "clock_compact_17": (
+            r"(?<!\d)(?P<y>\d{4})(?P<mo>\d{2})(?P<d>\d{2})"
+            r"(?P<h>\d{2})(?P<mi>\d{2})(?P<s>\d{2})(?P<ms>\d{3})(?!\d)"
+        ),
+        "clock_compact_14": (
+            r"(?<!\d)(?P<y>\d{4})(?P<mo>\d{2})(?P<d>\d{2})"
+            r"(?P<h>\d{2})(?P<mi>\d{2})(?P<s>\d{2})(?!\d)"
+        ),
+        "numeric_date": (
+            r"(?<!\d)(?P<a>\d{1,2})-(?P<b>\d{1,2})-(?P<y>\d{4})\s+"
+            r"(?P<h>\d{2})[.:](?P<mi>\d{2})(?:[.:](?P<s>\d{2}))?"
+        ),
+        "epoch_ms": r"(?<!\d)(?P<ms>\d{13})(?!\d)",
+        "date_only": r"(?<!\d)(?P<y>\d{4})[-_]?(?P<mo>\d{2})[-_]?(?P<d>\d{2})(?!\d)",
+    }
+    return tuple(
+        PatternRule(key, label, sources[key]) for key, label, _example, _groups in PATTERN_FIELDS
+    )
+
+
+DEFAULT_RULES = _builtin_rules()
+_RULE_KEYS = {rule.key for rule in DEFAULT_RULES}
+
 # key, label, hint, lowest, highest
 LIMIT_FIELDS = (
     ("min_year", "Minimum year", "A stamp before this year is ignored.", 1, 9999),
@@ -93,41 +137,64 @@ LIMIT_FIELDS = (
 )
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class TimestampPatterns:
-    """Filename patterns and the year window and priorities they are judged with.
+    """Filename rules and the year window and priorities they are judged with.
 
-    A blank pattern is turned off. The strings are the ones this tool ships
-    with, so leaving the options alone recognises the same names as before.
+    ``rules`` starts as the built-in rows. Pass a longer tuple to recognise
+    more names. A blank expression is turned off. Keyword arguments named
+    after a built-in key replace that row's expression, which is how the
+    original fixed fields still work.
     """
 
-    clock_separated: str = (
-        r"(?<!\d)(?P<y>\d{4})-(?P<mo>\d{2})-(?P<d>\d{2})-"
-        r"(?P<h>\d{2})-(?P<mi>\d{2})-(?P<s>\d{2})(?:-(?P<ms>\d{3}))?"
-    )
-    clock_compact_sep: str = (
-        r"(?<!\d)(?P<y>\d{4})(?P<mo>\d{2})(?P<d>\d{2})[_-]"
-        r"(?P<h>\d{2})(?P<mi>\d{2})(?P<s>\d{2})(?P<ms>\d{1,3})?(?!\d)"
-    )
-    clock_compact_17: str = (
-        r"(?<!\d)(?P<y>\d{4})(?P<mo>\d{2})(?P<d>\d{2})"
-        r"(?P<h>\d{2})(?P<mi>\d{2})(?P<s>\d{2})(?P<ms>\d{3})(?!\d)"
-    )
-    clock_compact_14: str = (
-        r"(?<!\d)(?P<y>\d{4})(?P<mo>\d{2})(?P<d>\d{2})"
-        r"(?P<h>\d{2})(?P<mi>\d{2})(?P<s>\d{2})(?!\d)"
-    )
-    numeric_date: str = (
-        r"(?<!\d)(?P<a>\d{1,2})-(?P<b>\d{1,2})-(?P<y>\d{4})\s+"
-        r"(?P<h>\d{2})[.:](?P<mi>\d{2})(?:[.:](?P<s>\d{2}))?"
-    )
-    epoch_ms: str = r"(?<!\d)(?P<ms>\d{13})(?!\d)"
-    date_only: str = r"(?<!\d)(?P<y>\d{4})[-_]?(?P<mo>\d{2})[-_]?(?P<d>\d{2})(?!\d)"
-    min_year: int = 1990
-    max_year: int = 2100
-    prec_clock: int = 30
-    prec_epoch: int = 20
-    prec_date: int = 10
+    rules: tuple[PatternRule, ...]
+    min_year: int
+    max_year: int
+    prec_clock: int
+    prec_epoch: int
+    prec_date: int
+
+    def __init__(
+        self,
+        rules: Sequence[PatternRule] | None = None,
+        *,
+        min_year: int = 1990,
+        max_year: int = 2100,
+        prec_clock: int = 30,
+        prec_epoch: int = 20,
+        prec_date: int = 10,
+        **overrides: str,
+    ) -> None:
+        unknown = set(overrides) - _RULE_KEYS
+        if unknown:
+            names = ", ".join(sorted(unknown))
+            raise TypeError(f"unexpected pattern fields: {names}")
+        chosen = list(DEFAULT_RULES if rules is None else rules)
+        if overrides:
+            seen = {rule.key for rule in chosen}
+            chosen = [
+                PatternRule(rule.key, rule.description, overrides[rule.key])
+                if rule.key in overrides
+                else rule
+                for rule in chosen
+            ]
+            labels = {key: label for key, label, *_rest in PATTERN_FIELDS}
+            for key, source in overrides.items():
+                if key not in seen:
+                    chosen.append(PatternRule(key, labels[key], source))
+        object.__setattr__(self, "rules", tuple(chosen))
+        object.__setattr__(self, "min_year", min_year)
+        object.__setattr__(self, "max_year", max_year)
+        object.__setattr__(self, "prec_clock", prec_clock)
+        object.__setattr__(self, "prec_epoch", prec_epoch)
+        object.__setattr__(self, "prec_date", prec_date)
+        self.__post_init__()
+
+    def __getattr__(self, name: str) -> str:
+        for rule in self.rules:
+            if rule.key == name:
+                return rule.pattern
+        raise AttributeError(name)
 
     def __post_init__(self) -> None:
         if self.min_year > self.max_year:
@@ -139,36 +206,45 @@ class TimestampPatterns:
                 raise ValueError(f"{label} must be >= 0")
 
     def compile(self) -> CompiledTimestampPatterns:
-        """Compile the patterns, or raise ``ValueError`` when one is unusable."""
+        """Compile the rules, or raise ``ValueError`` when one is unusable."""
 
-        compiled: dict[str, re.Pattern[str] | None] = {}
-        labels = {key: label for key, label, *_rest in PATTERN_FIELDS}
-        for key, required in _PATTERN_GROUPS.items():
+        compiled: list[CompiledRule] = []
+        for rule in self.rules:
+            label = rule.description.strip() or rule.key or "pattern"
             try:
-                compiled[key] = _compile_pattern(getattr(self, key), required)
+                pattern = _compile_rule(rule.pattern)
             except ValueError as exc:
-                raise ValueError(f"{labels[key]}: {exc}") from exc
+                raise ValueError(f"{label}: {exc}") from exc
+            if pattern is None:
+                continue
+            try:
+                kind = _kind_of(pattern)
+            except ValueError as exc:
+                raise ValueError(f"{label}: {exc}") from exc
+            compiled.append(CompiledRule(kind, pattern))
         return CompiledTimestampPatterns(
+            rules=tuple(compiled),
             min_year=self.min_year,
             max_year=self.max_year,
             prec_clock=self.prec_clock,
             prec_epoch=self.prec_epoch,
             prec_date=self.prec_date,
-            **compiled,
         )
 
 
 @dataclass(frozen=True, slots=True)
-class CompiledTimestampPatterns:
-    """Patterns compiled once for a scan, plus the year window and priorities."""
+class CompiledRule:
+    """One expression compiled for a scan, and how its groups are read."""
 
-    clock_separated: re.Pattern[str] | None
-    clock_compact_sep: re.Pattern[str] | None
-    clock_compact_17: re.Pattern[str] | None
-    clock_compact_14: re.Pattern[str] | None
-    numeric_date: re.Pattern[str] | None
-    epoch_ms: re.Pattern[str] | None
-    date_only: re.Pattern[str] | None
+    kind: str
+    pattern: re.Pattern[str]
+
+
+@dataclass(frozen=True, slots=True)
+class CompiledTimestampPatterns:
+    """Rules compiled once for a scan, plus the year window and priorities."""
+
+    rules: tuple[CompiledRule, ...]
     min_year: int
     max_year: int
     prec_clock: int
@@ -176,18 +252,25 @@ class CompiledTimestampPatterns:
     prec_date: int
 
 
-def _compile_pattern(source: str, required: frozenset[str]) -> re.Pattern[str] | None:
+def _compile_rule(source: str) -> re.Pattern[str] | None:
     if not source.strip():
         return None
     try:
-        pattern = re.compile(source)
+        return re.compile(source)
     except re.error as exc:
         raise ValueError(f"invalid regular expression ({exc})") from exc
-    missing = required - set(pattern.groupindex)
-    if missing:
-        names = ", ".join(sorted(missing))
-        raise ValueError(f"missing named groups {names}")
-    return pattern
+
+
+def _kind_of(pattern: re.Pattern[str]) -> str:
+    groups = set(pattern.groupindex)
+    for kind, required, optional in _KIND_SPECS:
+        if required <= groups <= required | optional:
+            return kind
+    raise ValueError(
+        "missing named groups for a clock (y, mo, d, h, mi, s), "
+        "a day-month clock (a, b, y, h, mi), Unix milliseconds (ms), "
+        "or a date (y, mo, d)"
+    )
 
 
 _EVENT_FOLDER = re.compile(
@@ -233,8 +316,7 @@ class FolderContents:
 def scan_directory(directory: Path) -> FolderContents:
     """List the chosen folder, including photos already inside event folders.
 
-    Other subfolders are recorded and not entered. The capture time still
-    comes from each filename, not from filesystem dates.
+    Other subfolders are recorded and not entered. Filesystem dates are not used.
     """
 
     folder = Path(directory)
@@ -267,12 +349,13 @@ def parse_timestamp(
 ) -> datetime | None:
     """Return the capture time embedded in ``filename``, or ``None``.
 
-    ``patterns`` defaults to :class:`TimestampPatterns`, which recognises
-    ``IMG_YYYYMMDD_HHMMSS``, compact ``YYYYMMDDHHMMSS`` (with optional
-    milliseconds), ``YYYY-MM-DD-HH-MM-SS``, ``DD-MM-YYYY HH.MM`` /
+    ``patterns`` defaults to :class:`TimestampPatterns`. Its built-in rules
+    recognise ``IMG_YYYYMMDD_HHMMSS``, compact ``YYYYMMDDHHMMSS`` (with
+    optional milliseconds), ``YYYY-MM-DD-HH-MM-SS``, ``DD-MM-YYYY HH.MM`` /
     ``MM-DD-YYYY HH.MM``, a bare ``YYYYMMDD``, and a 13-digit Unix millisecond
-    stamp. Epoch values are converted to local time so they line up with
-    camera names, which are local wall times.
+    stamp. Extra rules in ``patterns.rules`` are read the same way. Epoch
+    values are converted to local time so they line up with camera names,
+    which are local wall times.
 
     When a name contains more than one stamp, the one with the higher
     priority wins, and an earlier match wins a tie. With the defaults a clock
@@ -289,10 +372,15 @@ def parse_timestamp(
 
 def _timestamp_from(name: str, patterns: CompiledTimestampPatterns) -> datetime | None:
     found: list[tuple[int, int, datetime]] = []
-    found.extend(_clock_matches(name, patterns))
-    found.extend(_numeric_date_matches(name, patterns))
-    found.extend(_epoch_matches(name, patterns))
-    found.extend(_date_only_matches(name, patterns))
+    for rule in patterns.rules:
+        if rule.kind == "clock":
+            found.extend(_clock_matches(name, rule.pattern, patterns))
+        elif rule.kind == "numeric_date":
+            found.extend(_numeric_date_matches(name, rule.pattern, patterns))
+        elif rule.kind == "epoch_ms":
+            found.extend(_epoch_matches(name, rule.pattern, patterns))
+        elif rule.kind == "date_only":
+            found.extend(_date_only_matches(name, rule.pattern, patterns))
     if not found:
         return None
     found.sort(key=lambda item: (-item[0], item[1]))
@@ -300,44 +388,34 @@ def _timestamp_from(name: str, patterns: CompiledTimestampPatterns) -> datetime 
 
 
 def _clock_matches(
-    name: str, patterns: CompiledTimestampPatterns
+    name: str, pattern: re.Pattern[str], patterns: CompiledTimestampPatterns
 ) -> list[tuple[int, int, datetime]]:
     found: list[tuple[int, int, datetime]] = []
-    for pattern in (
-        patterns.clock_separated,
-        patterns.clock_compact_sep,
-        patterns.clock_compact_17,
-        patterns.clock_compact_14,
-    ):
-        if pattern is None:
+    for match in pattern.finditer(name):
+        millis = _millis_to_microseconds(match.groupdict().get("ms"))
+        if millis is None:
             continue
-        for match in pattern.finditer(name):
-            millis = _millis_to_microseconds(match.groupdict().get("ms"))
-            if millis is None:
-                continue
-            stamp = _make_datetime(
-                int(match.group("y")),
-                int(match.group("mo")),
-                int(match.group("d")),
-                int(match.group("h")),
-                int(match.group("mi")),
-                int(match.group("s")),
-                millis,
-                patterns.min_year,
-                patterns.max_year,
-            )
-            if stamp is not None:
-                found.append((patterns.prec_clock, match.start(), stamp))
+        stamp = _make_datetime(
+            int(match.group("y")),
+            int(match.group("mo")),
+            int(match.group("d")),
+            int(match.group("h")),
+            int(match.group("mi")),
+            int(match.group("s")),
+            millis,
+            patterns.min_year,
+            patterns.max_year,
+        )
+        if stamp is not None:
+            found.append((patterns.prec_clock, match.start(), stamp))
     return found
 
 
 def _numeric_date_matches(
-    name: str, patterns: CompiledTimestampPatterns
+    name: str, pattern: re.Pattern[str], patterns: CompiledTimestampPatterns
 ) -> list[tuple[int, int, datetime]]:
-    if patterns.numeric_date is None:
-        return []
     found: list[tuple[int, int, datetime]] = []
-    for match in patterns.numeric_date.finditer(name):
+    for match in pattern.finditer(name):
         year = int(match.group("y"))
         first = int(match.group("a"))
         second = int(match.group("b"))
@@ -359,12 +437,10 @@ def _numeric_date_matches(
 
 
 def _epoch_matches(
-    name: str, patterns: CompiledTimestampPatterns
+    name: str, pattern: re.Pattern[str], patterns: CompiledTimestampPatterns
 ) -> list[tuple[int, int, datetime]]:
-    if patterns.epoch_ms is None:
-        return []
     found: list[tuple[int, int, datetime]] = []
-    for match in patterns.epoch_ms.finditer(name):
+    for match in pattern.finditer(name):
         stamp = _from_epoch_millis(int(match.group("ms")), patterns.min_year, patterns.max_year)
         if stamp is not None:
             found.append((patterns.prec_epoch, match.start(), stamp))
@@ -372,12 +448,10 @@ def _epoch_matches(
 
 
 def _date_only_matches(
-    name: str, patterns: CompiledTimestampPatterns
+    name: str, pattern: re.Pattern[str], patterns: CompiledTimestampPatterns
 ) -> list[tuple[int, int, datetime]]:
-    if patterns.date_only is None:
-        return []
     found: list[tuple[int, int, datetime]] = []
-    for match in patterns.date_only.finditer(name):
+    for match in pattern.finditer(name):
         stamp = _make_datetime(
             int(match.group("y")),
             int(match.group("mo")),

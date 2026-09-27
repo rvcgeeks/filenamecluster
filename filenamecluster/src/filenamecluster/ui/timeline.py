@@ -47,6 +47,7 @@ class TimelineView(ttk.Frame):
         placeholder: str = "",
         on_select: Callable[[int], None] | None = None,
         on_time: Callable[[datetime], None] | None = None,
+        on_open: Callable[[int], None] | None = None,
         fonts: dict | None = None,
     ) -> None:
         super().__init__(master)
@@ -59,6 +60,7 @@ class TimelineView(ttk.Frame):
         self._placeholder = placeholder
         self._on_select = on_select
         self._on_time = on_time
+        self._on_open = on_open
         self._small = (fonts or {}).get("small")
 
         tools = ttk.Frame(self)
@@ -72,7 +74,7 @@ class TimelineView(ttk.Frame):
 
         self.canvas = tk.Canvas(
             self,
-            height=height,
+            height=theme.px(height),
             background=theme.SURFACE,
             highlightthickness=1,
             highlightbackground=theme.BORDER,
@@ -87,6 +89,7 @@ class TimelineView(ttk.Frame):
         self.rowconfigure(1, weight=1)
 
         self.canvas.bind("<Button-1>", self._clicked)
+        self.canvas.bind("<Double-Button-1>", self._double)
         self.canvas.bind("<MouseWheel>", self._wheel)
         self.canvas.bind("<Shift-MouseWheel>", self._wheel)
         self.canvas.bind("<Control-MouseWheel>", self._zoom_wheel)
@@ -177,7 +180,12 @@ class TimelineView(ttk.Frame):
         self.scale_label.configure(text="")
         self.canvas.configure(scrollregion=(0, 0, 1, 1))
         self.canvas.create_text(
-            16, 24, anchor="w", text=self._placeholder, fill=theme.MUTED, font=self._small
+            theme.px(16),
+            theme.px(24),
+            anchor="w",
+            text=self._placeholder,
+            fill=theme.MUTED,
+            font=self._small,
         )
 
     def _draw(self, pixels_per_day: float) -> None:
@@ -188,44 +196,49 @@ class TimelineView(ttk.Frame):
         canvas = self.canvas
         canvas.delete("all")
 
+        axis_y = theme.px(AXIS_Y)
+        lane_top = theme.px(LANE_TOP)
+        lane_height = theme.px(LANE_HEIGHT)
+        bar_height = theme.px(BAR_HEIGHT)
+        mark_height = theme.px(MARK_HEIGHT)
         lanes = max((bar.lane for bar in self.bars), default=0) + 1
-        marks_top = LANE_TOP + lanes * LANE_HEIGHT + 4
-        height = marks_top + MARK_HEIGHT + 8
+        marks_top = lane_top + lanes * lane_height + theme.px(4)
+        height = marks_top + mark_height + theme.px(8)
         width = scale.width
 
         ticks = axis_ticks(scale)
         for tick in ticks:
             if not tick.major:
-                canvas.create_line(tick.x, AXIS_Y, tick.x, height, fill=theme.GRID_MINOR)
+                canvas.create_line(tick.x, axis_y, tick.x, height, fill=theme.GRID_MINOR)
         for tick in ticks:
             if tick.major:
-                canvas.create_line(tick.x, AXIS_Y - 6, tick.x, height, fill=theme.GRID_MAJOR)
+                canvas.create_line(tick.x, axis_y - theme.px(6), tick.x, height, fill=theme.GRID_MAJOR)
                 canvas.create_text(
-                    tick.x + 3,
-                    AXIS_Y - 4,
+                    tick.x + theme.px(3),
+                    axis_y - theme.px(4),
                     anchor="sw",
                     text=tick.label,
                     fill=theme.MUTED,
                     font=self._small,
                 )
-        canvas.create_line(0, AXIS_Y, width, AXIS_Y, fill=theme.BORDER)
+        canvas.create_line(0, axis_y, width, axis_y, fill=theme.BORDER)
 
         for bar in self.bars:
             cluster = self.clusters[bar.index]
-            top = LANE_TOP + bar.lane * LANE_HEIGHT
+            top = lane_top + bar.lane * lane_height
             tags = ("bar", f"c{bar.index}")
             canvas.create_rectangle(
                 bar.x0,
                 top,
                 bar.x1,
-                top + BAR_HEIGHT,
+                top + bar_height,
                 fill=theme.BAR_FILLS[cluster.number % 2],
                 outline=theme.BAR_OUTLINE,
                 tags=(*tags, "rect"),
             )
             canvas.create_text(
-                bar.x0 + 3,
-                top + BAR_HEIGHT / 2,
+                bar.x0 + theme.px(3),
+                top + bar_height / 2,
                 anchor="w",
                 text=str(cluster.number),
                 fill=theme.TEXT,
@@ -234,7 +247,7 @@ class TimelineView(ttk.Frame):
             )
 
         for x in file_marks(self.clusters, scale):
-            canvas.create_line(x, marks_top, x, marks_top + MARK_HEIGHT, fill=theme.FILE_MARK)
+            canvas.create_line(x, marks_top, x, marks_top + mark_height, fill=theme.FILE_MARK)
 
         canvas.configure(scrollregion=(0, 0, width, height))
         self.scale_label.configure(text=_describe_zoom(scale.pixels_per_day))
@@ -251,19 +264,35 @@ class TimelineView(ttk.Frame):
                 width=2 if chosen else 1,
             )
 
-    def _clicked(self, event: tk.Event) -> None:
-        if self.scale is None:
-            return
+    def _bar_index(self) -> int | None:
         tags = self.canvas.gettags("current")
         index = next(
             (int(tag[1:]) for tag in tags if len(tag) > 1 and tag[0] == "c" and tag[1:].isdigit()),
             None,
         )
         if index is not None and "bar" in tags:
+            return index
+        return None
+
+    def _clicked(self, event: tk.Event) -> None:
+        if self.scale is None:
+            return
+        index = self._bar_index()
+        if index is not None:
             if self._on_select:
                 self._on_select(index)
         elif self._on_time:
             self._on_time(self.scale.when(self.canvas.canvasx(event.x)))
+
+    def _double(self, event: tk.Event) -> None:
+        """Open the folder for the orange selection."""
+
+        if self.scale is None or self._on_open is None:
+            return
+        index = self._bar_index()
+        if index is None or index != self.selected:
+            return
+        self._on_open(index)
 
     def _scroll(self, steps: int) -> str:
         self.canvas.xview_scroll(steps * 3, "units")

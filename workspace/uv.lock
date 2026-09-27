@@ -132,7 +132,7 @@ toml = [
 
 [[package]]
 name = "filenamecluster"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "../filenamecluster" }
 
 [package.metadata]
@@ -379,7 +379,7 @@ wheels = [
 
 [[package]]
 name = "workspace"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 dependencies = [
     { name = "filenamecluster" },
