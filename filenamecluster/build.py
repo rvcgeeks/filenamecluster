@@ -110,12 +110,15 @@ def _bundled_files() -> list[tuple[Path, str]]:
     """JSON catalogs and the window icon, placed beside their modules."""
 
     files = [
-        (path, "filenamecluster/ui/i18n")
-        for path in sorted((PACKAGE / "ui" / "i18n").glob("*.json"))
+        (path, "filenamecluster/ui/model/i18n")
+        for path in sorted((PACKAGE / "ui" / "model" / "i18n").glob("*.json"))
     ]
     icon = PACKAGE / "ui" / "assets" / "icon.png"
     if icon.is_file():
         files.append((icon, "filenamecluster/ui/assets"))
+    spinner = PACKAGE / "ui" / "assets" / "spinner.gif"
+    if spinner.is_file():
+        files.append((spinner, "filenamecluster/ui/assets"))
     return files
 
 

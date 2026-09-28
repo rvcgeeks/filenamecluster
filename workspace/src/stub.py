@@ -207,7 +207,7 @@ def _names_from_listing(lines: list[str]) -> tuple[list[str], int, str]:
 
 
 def _plain_name(raw: str) -> str | None:
-    name = raw[2:] if raw.startswith("./") or raw.startswith(".\\") else raw
+    name = raw[2:] if raw.startswith(("./", ".\\")) else raw
     if (
         not name
         or name in PROTECTED

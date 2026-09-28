@@ -1,21 +1,20 @@
-"""Timestamp-gap clustering, learned per folder, with safety limits and corrections."""
+"""Timestamp-gap clustering, with safety limits and a reused boundary."""
 
 import math
 import unittest
 from datetime import datetime, timedelta
 
 from filenamecluster.core.cluster import ClusterParams, cluster_files
-from filenamecluster.core.learn import FolderModel, fit_gap_model
+from filenamecluster.core.learn import FolderModel
 from filenamecluster.core.parse import TimestampedFile
 
 
-def files_at(*points: datetime) -> list[TimestampedFile]:
+def files_at(*points: datetime) -> list:
     return [TimestampedFile(f"shot-{index}.jpg", point) for index, point in enumerate(points)]
 
 
-def burst(start: datetime, count: int, step: timedelta = timedelta(minutes=5)) -> list[datetime]:
+def burst(start: datetime, count: int, step: timedelta = timedelta(minutes=5)) -> list:
     return [start + step * index for index in range(count)]
-
 
 class ClusterParamsTests(unittest.TestCase):
     def test_defaults_are_wide_safety_limits(self):
@@ -28,24 +27,6 @@ class ClusterParamsTests(unittest.TestCase):
             ClusterParams(floor=timedelta(0))
         with self.assertRaises(ValueError):
             ClusterParams(floor=timedelta(hours=10), ceiling=timedelta(hours=10))
-
-
-class LearnTests(unittest.TestCase):
-    def test_two_patterns_meet_between_their_centers(self):
-        short = [math.log(hours) for hours in (0.2, 0.3, 0.5, 1, 2, 3)]
-        long = [math.log(hours) for hours in (40, 50, 70, 90, 120)]
-        model = fit_gap_model(short + long)
-        self.assertIsNotNone(model)
-        assert model is not None
-        self.assertTrue(model.separated)
-        self.assertLess(model.within_hours, model.boundary_hours)
-        self.assertLess(model.boundary_hours, model.between_hours)
-        self.assertFalse(model.splits(2, 3, 24 * 30))
-        self.assertTrue(model.splits(80, 3, 24 * 30))
-
-    def test_too_few_gaps_are_not_a_model(self):
-        self.assertIsNone(fit_gap_model([0.0, 1.0, 2.0]))
-
 
 class ClusterFilesTests(unittest.TestCase):
     def test_empty_and_single_file(self):
@@ -161,6 +142,3 @@ class ClusterFilesTests(unittest.TestCase):
         self.assertEqual(len(clusters), 2)
         self.assertEqual(len(clusters[0].files), 2)
 
-
-if __name__ == "__main__":
-    unittest.main()

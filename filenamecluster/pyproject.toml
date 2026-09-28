@@ -1,6 +1,6 @@
 [project]
 name = "filenamecluster"
-version = "0.1.1"
+version = "0.1.2"
 description = "Tkinter app that clusters camera-roll files into chronological events using the timestamp in each filename, or picture, video, or PDF creation metadata when the name has none."
 authors = [{ name = "Rajas Chavadekar", email = "rvchavadekar@gmail.com" }]
 requires-python = ">=3.11"
@@ -32,19 +32,26 @@ build-backend = "hatchling.build"
 packages = ["src/filenamecluster"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"src/filenamecluster/ui/i18n/en.json" = "filenamecluster/ui/i18n/en.json"
-"src/filenamecluster/ui/i18n/hi.json" = "filenamecluster/ui/i18n/hi.json"
-"src/filenamecluster/ui/i18n/mr.json" = "filenamecluster/ui/i18n/mr.json"
-"src/filenamecluster/ui/i18n/de.json" = "filenamecluster/ui/i18n/de.json"
-"src/filenamecluster/ui/i18n/fr.json" = "filenamecluster/ui/i18n/fr.json"
-"src/filenamecluster/ui/i18n/ja.json" = "filenamecluster/ui/i18n/ja.json"
-"src/filenamecluster/ui/i18n/ko.json" = "filenamecluster/ui/i18n/ko.json"
+"src/filenamecluster/ui/model/i18n/en.json" = "filenamecluster/ui/model/i18n/en.json"
+"src/filenamecluster/ui/model/i18n/hi.json" = "filenamecluster/ui/model/i18n/hi.json"
+"src/filenamecluster/ui/model/i18n/mr.json" = "filenamecluster/ui/model/i18n/mr.json"
+"src/filenamecluster/ui/model/i18n/de.json" = "filenamecluster/ui/model/i18n/de.json"
+"src/filenamecluster/ui/model/i18n/fr.json" = "filenamecluster/ui/model/i18n/fr.json"
+"src/filenamecluster/ui/model/i18n/ja.json" = "filenamecluster/ui/model/i18n/ja.json"
+"src/filenamecluster/ui/model/i18n/ko.json" = "filenamecluster/ui/model/i18n/ko.json"
+
+[tool.ruff.lint]
+# E4, E7, E9, and F are the project lint. Filename clocks stay naive local times.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.uv]
 python-preference = "only-managed"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# pytest captures INFO from non-propagating loggers and pytest-html embeds it.
+# A full camera-roll trace makes reports/pytest.html hundreds of megabytes.
+log_level = "WARNING"
 addopts = [
     "--cov=filenamecluster",
     "--cov-report=term-missing",

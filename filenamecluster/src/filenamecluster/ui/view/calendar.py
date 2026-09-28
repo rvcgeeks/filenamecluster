@@ -5,6 +5,9 @@ Author: Rajas Chavadekar (rvchavadekar@gmail.com). Design: ``docs/architecture.m
 
 from __future__ import annotations
 
+import sys
+from filenamecluster.log import trace_module
+
 import calendar
 import tkinter as tk
 from dataclasses import dataclass
@@ -13,8 +16,8 @@ from tkinter import ttk
 from typing import Callable, Sequence
 
 from filenamecluster.core.organize import NamedCluster
-from filenamecluster.ui import theme
-from filenamecluster.ui.i18n import file_count, t
+from filenamecluster.ui.view import theme
+from filenamecluster.ui.model.i18n import file_count, t
 
 PHOTO_FILLS = ("#aed6f1", "#7fb9e6")
 SPAN_FILL = "#e3f0fa"
@@ -262,3 +265,5 @@ class CalendarView(ttk.Frame):
         if info is None or info.cluster is None or info.cluster != self.selected_cluster:
             return
         self._on_open(info.cluster)
+
+trace_module(sys.modules[__name__])

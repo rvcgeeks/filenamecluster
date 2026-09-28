@@ -9,6 +9,9 @@ is proportional to the real time between them.
 
 from __future__ import annotations
 
+import sys
+from filenamecluster.log import trace_module
+
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterator, Sequence
@@ -179,3 +182,5 @@ def _month_starts(start: datetime, end: datetime) -> Iterator[datetime]:
 def _year_starts(start: datetime, end: datetime) -> Iterator[datetime]:
     for year in range(start.year, end.year + 1):
         yield datetime(year, 1, 1)
+
+trace_module(sys.modules[__name__])

@@ -9,18 +9,26 @@ alone, and a pause becomes a new event when it looks more like the long
 pattern than the short one.
 
 The fitted boundary is written to ``filenamecluster-model.json`` beside the
-files, where it can be opened and inspected. It is not a hidden file.
+files, where it can be opened and inspected. It is not a hidden file. The same
+file stores the options last used for that folder under ``options``, beside
+``learned``. Options do not change how the boundary is fitted or reused.
 """
 
 from __future__ import annotations
 
 import json
 import math
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from filenamecluster.log import detail, event, trace_module
+
 _VARIANCE_FLOOR = 0.05
 _SEPARATION = 1.0
+# Each pass is one E-step and one M-step, like one training epoch.
+# The loop does not stop early when the numbers settle. Change this to refit longer or shorter.
+EM_ROUNDS = 25
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,8 +65,11 @@ def fit_gap_model(
     within = list(forced_within or [])
     between = list(forced_between or [])
     unlabeled = list(log_hours)
-    if len(unlabeled) + len(within) + len(between) < 4:
+    samples = len(unlabeled) + len(within) + len(between)
+    if samples < 4:
+        detail("fit_skipped", samples=samples, need=4)
         return None
+    detail("fit_started", unlabeled=len(unlabeled), pinned_within=len(within), pinned_between=len(between))
 
     ordered = sorted(unlabeled or within + between)
     low = ordered[: max(1, len(ordered) // 2)]
@@ -69,7 +80,7 @@ def fit_gap_model(
     var_between = max(_variance(high, mean_between), _VARIANCE_FLOOR)
     weight_within = 0.5
 
-    for _ in range(25):
+    for step in range(EM_ROUNDS):
         responsibilities: list[tuple[float, float, float]] = []
         for value in unlabeled:
             within_share = _responsibility(
@@ -90,6 +101,7 @@ def fit_gap_model(
         total_between = sum(share for _, _, share in responsibilities)
         total = total_within + total_between
         if total_within < 1e-6 or total_between < 1e-6:
+            detail("fit_collapsed", step=step, weight_within=total_within, weight_between=total_between)
             break
         mean_within = sum(value * share for value, share, _ in responsibilities) / total_within
         mean_between = sum(value * share for value, _, share in responsibilities) / total_between
@@ -104,10 +116,19 @@ def fit_gap_model(
             _VARIANCE_FLOOR,
         )
         weight_within = total_within / total
-        if mean_within > mean_between:
+        swapped = mean_within > mean_between
+        if swapped:
             mean_within, mean_between = mean_between, mean_within
             var_within, var_between = var_between, var_within
             weight_within = 1.0 - weight_within
+        detail(
+            "fit_iteration",
+            step=step,
+            within_hours=math.exp(mean_within),
+            between_hours=math.exp(mean_between),
+            weight_within=weight_within,
+            swapped=swapped,
+        )
 
     separated = mean_between - mean_within >= _SEPARATION and 0.05 < weight_within < 0.95
     if separated:
@@ -130,12 +151,21 @@ def fit_gap_model(
             boundary = center - 0.5 * spread
         else:
             boundary = center + 2.0 * spread
-    return GapModel(
+    model = GapModel(
         within_hours=math.exp(mean_within),
         between_hours=math.exp(mean_between),
         boundary_hours=math.exp(boundary),
         separated=separated,
     )
+    detail(
+        "fit_finished",
+        within_hours=model.within_hours,
+        between_hours=model.between_hours,
+        boundary_hours=model.boundary_hours,
+        separated=model.separated,
+        rule="two_hills" if separated else "one_rhythm",
+    )
+    return model
 
 
 def _responsibility(
@@ -207,13 +237,39 @@ MODEL_NAME = "filenamecluster-model.json"
 
 
 @dataclass(frozen=True, slots=True)
+class ModelOptions:
+    """Safety limits, year window, priorities, and filename rules for one folder.
+
+    Saved beside ``learned``. Loading them overrides the built-in defaults.
+    Fitting and reusing the boundary does not read this object.
+    """
+
+    floor_hours: float
+    ceiling_hours: float
+    min_year: int
+    max_year: int
+    prec_clock: int
+    prec_epoch: int
+    prec_date: int
+    rules: tuple[tuple[str, str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class FolderModel:
-    """The boundary last written for one folder."""
+    """The boundary and options last written for one folder."""
 
     learned: GapModel | None = None
+    options: ModelOptions | None = None
 
     def with_learned(self, learned: GapModel | None) -> FolderModel:
-        return FolderModel(learned)
+        """Replace the boundary and keep the saved options."""
+
+        return FolderModel(learned, self.options)
+
+    def with_options(self, options: ModelOptions | None) -> FolderModel:
+        """Replace the saved options and keep the boundary."""
+
+        return FolderModel(self.learned, options)
 
 
 def model_path(directory: Path | str) -> Path:
@@ -225,17 +281,46 @@ def load_model(directory: Path | str) -> FolderModel:
 
     path = model_path(directory)
     if not path.is_file():
+        event("model_missing", path=str(path))
         return FolderModel()
     raw = json.loads(path.read_text(encoding="utf-8"))
-    return FolderModel(learned=_learned(raw.get("learned")))
+    model = FolderModel(learned=_learned(raw.get("learned")), options=_options(raw.get("options")))
+    event(
+        "model_loaded",
+        path=str(path),
+        learned=model.learned is not None,
+        options=model.options is not None,
+    )
+    if model.learned is not None:
+        detail(
+            "learned_loaded",
+            within_hours=model.learned.within_hours,
+            between_hours=model.learned.between_hours,
+            boundary_hours=model.learned.boundary_hours,
+            separated=model.learned.separated,
+        )
+    if model.options is not None:
+        detail(
+            "options_loaded",
+            floor_hours=model.options.floor_hours,
+            ceiling_hours=model.options.ceiling_hours,
+            min_year=model.options.min_year,
+            max_year=model.options.max_year,
+            rules=len(model.options.rules),
+        )
+    return model
 
 
 def save_model(directory: Path | str, model: FolderModel) -> Path:
-    """Write the model where the user can see it, and return that path."""
+    """Write the learned boundary and the options, and return that path."""
 
     path = model_path(directory)
-    document = {"learned": _learned_document(model.learned)}
+    document = {
+        "learned": _learned_document(model.learned),
+        "options": _options_document(model.options),
+    }
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    event("model_saved", path=str(path), learned=model.learned is not None, options=model.options is not None)
     return path
 
 
@@ -262,3 +347,52 @@ def _learned_document(model: GapModel | None) -> dict | None:
         "boundary_hours": model.boundary_hours,
         "separated": model.separated,
     }
+
+
+def _options(raw: object) -> ModelOptions | None:
+    """Read ``options``. A missing or unusable object leaves the defaults in place."""
+
+    if not isinstance(raw, dict):
+        return None
+    try:
+        rules_raw = raw["rules"]
+        if not isinstance(rules_raw, list):
+            return None
+        rules: list[tuple[str, str, str]] = []
+        for item in rules_raw:
+            if not isinstance(item, dict):
+                return None
+            rules.append((str(item["key"]), str(item["description"]), str(item["pattern"])))
+        return ModelOptions(
+            floor_hours=float(raw["floor_hours"]),
+            ceiling_hours=float(raw["ceiling_hours"]),
+            min_year=int(raw["min_year"]),
+            max_year=int(raw["max_year"]),
+            prec_clock=int(raw["prec_clock"]),
+            prec_epoch=int(raw["prec_epoch"]),
+            prec_date=int(raw["prec_date"]),
+            rules=tuple(rules),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _options_document(options: ModelOptions | None) -> dict | None:
+    if options is None:
+        return None
+    return {
+        "floor_hours": options.floor_hours,
+        "ceiling_hours": options.ceiling_hours,
+        "min_year": options.min_year,
+        "max_year": options.max_year,
+        "prec_clock": options.prec_clock,
+        "prec_epoch": options.prec_epoch,
+        "prec_date": options.prec_date,
+        "rules": [
+            {"key": key, "description": description, "pattern": pattern}
+            for key, description, pattern in options.rules
+        ],
+    }
+
+
+trace_module(sys.modules[__name__])

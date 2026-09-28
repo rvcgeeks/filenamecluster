@@ -5,6 +5,8 @@ Author: Rajas Chavadekar (rvchavadekar@gmail.com). Design: ``docs/architecture.m
 
 from __future__ import annotations
 
+from filenamecluster.log import trace_module
+
 import ctypes
 import sys
 import tkinter as tk
@@ -73,7 +75,7 @@ _SCRIPT_FACES["mr"] = _SCRIPT_FACES["hi"]
 def px(value: float) -> int:
     """A layout length, grown when text is rasterised above 1x."""
 
-    return max(1, int(round(value * UI_SCALE)))
+    return max(1, round(value * UI_SCALE))
 
 
 def prepare_process_dpi() -> None:
@@ -285,3 +287,5 @@ def apply(root: tk.Misc) -> dict[str, tkfont.Font]:
         "TScrollbar", background=PANEL, arrowcolor=ACCENT, troughcolor=BACKGROUND
     )
     return fonts
+
+trace_module(sys.modules[__name__])

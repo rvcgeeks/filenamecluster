@@ -36,7 +36,7 @@ From `workspace`, with [uv](https://docs.astral.sh/uv/):
 uv run filenamecluster
 ```
 
-The interpreter is the uv-managed Python, which has Tk. Choose a folder in the window. The preview is drawn immediately. **Apply clustering** creates the event folders and moves the files. **Flatten clustering** moves those files back and removes the event folders. Other subfolders are left alone.
+The interpreter is the uv-managed Python, which has Tk. Choose a folder in the window. A dialog plays `spinner.gif` while that folder is read, then the preview appears. **Apply clustering** and **Flatten clustering** each show the spinner twice: first while the folder is read, before the confirmation of which files will move, and again after you confirm, while the files are moved. The spinner is a borderless, see-through overlay with a large bold line that says what is happening, for example whether event clusters are being calculated or files are being moved. The work runs on a background thread, so the window stays responsive. Buttons and option controls are disabled until each wait finishes. Other subfolders are left alone.
 
 After Apply, the preview stays until you choose another folder. Copy a later batch into the same folder and click **Update preview**. Files already inside event folders are included. A new file joins an existing event when the pause is short enough, or starts a new one when it is not. Apply then moves only the files that need a different folder.
 
@@ -46,7 +46,7 @@ Double-click the selected orange or yellow event in the calendar, either timelin
   <img src="docs/assets/options.png" alt="Options tab: safety limits, year window, priorities, and filename patterns">
 </p>
 
-The Options tab keeps one arrangement. Filename patterns span the top. Under them, three columns hold the safety limits, the year window, and the learned model. The row sash and the two column sashes are resizable, and the panes stretch when the window does. The two safety limits wrap the learned boundary: never split before 3 hours, always split after 720 hours. The year window and priorities start with built-in values. Filename patterns are editable rows in a table with descriptions; additional rules can be added and custom rows can be removed. The model table is read-only and lists every field in `filenamecluster-model.json` (`learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, `learned.separated`) at the same precision as the file. Before a folder is chosen the values are blank; when the folder has no fitted boundary they read `null`. **Update preview** redraws with the current values and refreshes the model table. **Restore defaults** puts the built-in values back.
+The Options tab keeps one arrangement. Filename patterns span the top. Under them, three columns hold the safety limits, the year window, and the learned model. The row sash and the two column sashes are resizable, and the panes stretch when the window does. The two safety limits wrap the learned boundary: never split before 3 hours, always split after 720 hours. The year window and priorities start with built-in values. Filename patterns are editable rows in a table with descriptions; additional rules can be added and custom rows can be removed. The model table is read-only and lists the learned fields (`learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, `learned.separated`) at the same precision as the file. Before a folder is chosen the values are blank; when the folder has no fitted boundary they read `null`. Choosing a folder loads that folder's saved options over the built-in defaults. **Update preview** redraws with the current values and refreshes the model table. **Restore defaults** puts the built-in values back and the next preview writes those defaults into the file.
 
 ## What gets written
 
@@ -59,11 +59,29 @@ In the folder you chose, next to the files, not hidden:
     "between_hours": 81.12551521324934,
     "boundary_hours": 37.98317023002044,
     "separated": true
+  },
+  "options": {
+    "floor_hours": 3.0,
+    "ceiling_hours": 720.0,
+    "min_year": 1990,
+    "max_year": 2100,
+    "prec_clock": 30,
+    "prec_epoch": 20,
+    "prec_date": 10,
+    "rules": [
+      {
+        "key": "clock_separated",
+        "description": "Dashed clock",
+        "pattern": "(?<!\\d)(?P<y>\\d{4})-..."
+      }
+    ]
   }
 }
 ```
 
-`filenamecluster-model.json` keeps the fitted hours at full precision. The Options tab lists these fields in a read-only table with the same digits. A later batch that is too small to fit a new boundary reuses these numbers. The scan ignores this filename, so it is not treated as media.
+`filenamecluster-model.json` keeps the fitted hours at full precision. The Options tab lists those four learned fields in a read-only table with the same digits. A later batch that is too small to fit a new boundary reuses these numbers. The `options` object beside `learned` stores the safety limits, year window, priorities, and every filename-pattern row last used for this folder. Choosing the folder loads them over the built-in defaults. An older file that has only `learned` still loads, and a broken `options` object does not discard the saved boundary. The scan ignores this filename, so it is not treated as media.
+
+The About tab has a separate guide to the filename regular expressions, in short sections with two worked examples, and it states the full path of the application log for this computer. On macOS that file is `~/Library/Logs/filenamecluster/filenamecluster.log`. On Windows it is `%LOCALAPPDATA%/filenamecluster/Logs/filenamecluster.log`. On Linux it is `$XDG_STATE_HOME/filenamecluster/filenamecluster.log`, or `~/.local/state/filenamecluster/filenamecluster.log` when `XDG_STATE_HOME` is unset.
 
 Event folders are named so a plain sort follows time:
 
@@ -92,4 +110,4 @@ From `filenamecluster`:
 uv run pytest
 ```
 
-Coverage is written to `filenamecluster/reports/` and is required to stay at or above 80%. UI tests build real Tk widgets on a root that remains withdrawn, so the suite never presents an application window.
+Coverage is written to `filenamecluster/reports/` and is required to stay at or above 80%. The tests follow the same folders as `src/filenamecluster`, including `ui/model`, `ui/view`, and `ui/controller`. UI tests build real Tk widgets on a root that remains withdrawn, so the suite never presents an application window.

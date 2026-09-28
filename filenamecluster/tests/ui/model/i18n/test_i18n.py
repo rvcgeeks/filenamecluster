@@ -2,7 +2,7 @@
 
 import unittest
 
-from filenamecluster.ui.i18n import CATALOGS, set_language, t
+from filenamecluster.ui.model.i18n import CATALOGS, set_language, t
 
 
 class CatalogTests(unittest.TestCase):
@@ -19,6 +19,11 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(t("flatten"), "Flatten clustering")
         self.assertIn("filenamecluster-model.json", t("about_options_body"))
         self.assertIn("timestamps only", t("about_options_body"))
+        self.assertIn("options", t("about_options_body"))
+        self.assertIn("finditer", t("about_regex_body").format())
+        self.assertIn("(?P<y>", t("about_regex_camera_body").format())
+        self.assertIn("CamScanner", t("about_regex_scan_body").format())
+        self.assertIn("{path}", CATALOGS["en"]["about_logging_body"])
         set_language("hi")
         self.assertNotEqual(t("apply"), "Apply clustering")
         set_language("en")

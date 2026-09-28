@@ -1,13 +1,12 @@
-"""Timeline geometry and calendar summaries, without opening a window."""
+"""Timeline geometry, without opening a window."""
 
 import unittest
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from filenamecluster.core.cluster import Cluster
 from filenamecluster.core.organize import name_clusters
 from filenamecluster.core.parse import TimestampedFile
-from filenamecluster.ui.calendar import month_weeks, shift_month, summarize_days
-from filenamecluster.ui.layout import (
+from filenamecluster.ui.view.layout import (
     MARGIN,
     MAX_WIDTH,
     MIN_BAR,
@@ -30,7 +29,6 @@ def events(*groups):
 
 
 DAY = datetime(2024, 1, 1)
-
 
 class TimeScaleTests(unittest.TestCase):
     def test_positions_are_to_scale_and_invertible(self):
@@ -55,7 +53,6 @@ class TimeScaleTests(unittest.TestCase):
     def test_fit_uses_the_available_width(self):
         ppd = fit_pixels_per_day(DAY, DAY + timedelta(days=10), 2 * MARGIN + 500)
         self.assertAlmostEqual(ppd, 50)
-
 
 class BarTests(unittest.TestCase):
     def test_overlapping_labels_go_to_a_new_lane(self):
@@ -82,7 +79,6 @@ class BarTests(unittest.TestCase):
         self.assertEqual(bars[0].x0, MARGIN)
         self.assertEqual(bars[0].x1, scale.x(DAY + timedelta(hours=3)))
         self.assertEqual(file_marks(clusters, scale), [round(scale.x(DAY + timedelta(hours=3)))])
-
 
 class TickTests(unittest.TestCase):
     def test_levels_follow_the_zoom(self):
@@ -112,27 +108,3 @@ class TickTests(unittest.TestCase):
         ticks = axis_ticks(TimeScale(datetime(2000, 1, 1), datetime(2040, 1, 1), 0.02))
         self.assertTrue(all(int(tick.label) % 8 == 0 for tick in ticks))
 
-
-class CalendarDataTests(unittest.TestCase):
-    def test_days_inside_an_event_are_filled(self):
-        clusters = events(
-            [DAY + timedelta(hours=10), DAY + timedelta(hours=11), DAY + timedelta(days=2)],
-            [DAY + timedelta(days=9)],
-        )
-        days = summarize_days(clusters)
-        self.assertEqual(days[date(2024, 1, 1)].files, 2)
-        self.assertEqual(days[date(2024, 1, 2)].files, 0)
-        self.assertEqual(days[date(2024, 1, 2)].cluster, 0)
-        self.assertEqual(days[date(2024, 1, 10)].cluster, 1)
-        self.assertNotIn(date(2024, 1, 5), days)
-
-    def test_month_helpers(self):
-        weeks = month_weeks(2024, 2)
-        self.assertEqual(weeks[0][0], date(2024, 1, 29))
-        self.assertTrue(all(len(week) == 7 for week in weeks))
-        self.assertEqual(shift_month(2024, 12, 1), (2025, 1))
-        self.assertEqual(shift_month(2024, 1, -1), (2023, 12))
-
-
-if __name__ == "__main__":
-    unittest.main()

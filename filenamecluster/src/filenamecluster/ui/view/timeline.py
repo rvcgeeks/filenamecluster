@@ -5,15 +5,18 @@ Author: Rajas Chavadekar (rvchavadekar@gmail.com). Design: ``docs/architecture.m
 
 from __future__ import annotations
 
+import sys
+from filenamecluster.log import trace_module
+
 import tkinter as tk
 from datetime import datetime
 from tkinter import ttk
 from typing import Callable, Sequence
 
 from filenamecluster.core.organize import NamedCluster
-from filenamecluster.ui import theme
-from filenamecluster.ui.i18n import t
-from filenamecluster.ui.layout import (
+from filenamecluster.ui.view import theme
+from filenamecluster.ui.model.i18n import t
+from filenamecluster.ui.view.layout import (
     Bar,
     TimeScale,
     axis_ticks,
@@ -312,3 +315,5 @@ def _describe_zoom(pixels_per_day: float) -> str:
     if pixels_per_day >= 1:
         return t("zoom_day", n=f"{pixels_per_day:.0f}")
     return t("zoom_month", n=f"{pixels_per_day * 30:.0f}")
+
+trace_module(sys.modules[__name__])

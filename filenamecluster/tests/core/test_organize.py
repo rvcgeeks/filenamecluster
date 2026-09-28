@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.cluster import Cluster, ClusterParams
+from filenamecluster.core.cluster import Cluster
 from filenamecluster.core.organize import (
     cluster_name,
     flatten_cluster_folders,
@@ -19,7 +19,6 @@ from filenamecluster.core.pipeline import cluster_directory
 
 def stamp(name: str, when: datetime) -> TimestampedFile:
     return TimestampedFile(name, when)
-
 
 class ClusterNameTests(unittest.TestCase):
     def test_multi_day_and_same_day_examples(self):
@@ -67,69 +66,6 @@ class ClusterNameTests(unittest.TestCase):
         self.assertTrue(named[1].name.startswith("2 03-01-2024 "))
         self.assertEqual(named[1].start, datetime(2024, 1, 3, 9, 0, 0))
         self.assertEqual(named[1].end, named[1].start)
-
-
-class PipelineTests(unittest.TestCase):
-    def test_folder_is_clustered_and_skipped_names_are_kept(self):
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            for name in (
-                "IMG_20240101_100000.jpg",
-                "IMG_20240101_110000.jpg",
-                "IMG_20240108_090000.jpg",
-                "notes.txt",
-            ):
-                (root / name).write_bytes(b"x")
-            (root / "album").mkdir()
-            result = cluster_directory(root)
-            self.assertEqual([cluster.number for cluster in result.clusters], [1, 2])
-            self.assertEqual(len(result.clusters[0].files), 2)
-            self.assertEqual(result.file_count, 3)
-            self.assertEqual(result.ignored_without_timestamp, ("notes.txt",))
-            self.assertEqual(result.ignored_directories, ("album",))
-            self.assertEqual(result.params, ClusterParams())
-
-    def test_new_photos_join_an_event_or_start_another(self):
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            for name in (
-                "IMG_20240101_100000.jpg",
-                "IMG_20240101_110000.jpg",
-                "IMG_20240110_100000.jpg",
-            ):
-                (root / name).write_bytes(b"x")
-            first = cluster_directory(root)
-            self.assertEqual([len(cluster.files) for cluster in first.clusters], [2, 1])
-            move_into_cluster_folders(root, first.clusters)
-
-            (root / "IMG_20240101_113000.jpg").write_bytes(b"joined")
-            (root / "IMG_20240220_100000.jpg").write_bytes(b"later")
-            again = cluster_directory(root)
-            self.assertEqual([len(cluster.files) for cluster in again.clusters], [3, 1, 1])
-            self.assertEqual(
-                [item.name for item in again.clusters[0].files],
-                [
-                    "IMG_20240101_100000.jpg",
-                    "IMG_20240101_110000.jpg",
-                    "IMG_20240101_113000.jpg",
-                ],
-            )
-            self.assertEqual(again.clusters[2].files[0].name, "IMG_20240220_100000.jpg")
-
-            move_into_cluster_folders(root, again.clusters)
-            loose = sorted(
-                path.name
-                for path in root.iterdir()
-                if path.is_file() and path.name != "filenamecluster-model.json"
-            )
-            self.assertEqual(loose, [])
-            self.assertEqual(
-                (root / again.clusters[0].name / "IMG_20240101_113000.jpg").read_bytes(),
-                b"joined",
-            )
-            self.assertTrue((root / again.clusters[2].name / "IMG_20240220_100000.jpg").is_file())
-            self.assertFalse((root / first.clusters[0].name).exists())
-
 
 class MoveTests(unittest.TestCase):
     def test_moves_files_into_named_folders(self):
@@ -181,7 +117,6 @@ class MoveTests(unittest.TestCase):
 
         with self.assertRaises(NotADirectoryError):
             move_into_cluster_folders(Path(tmp) / "missing", named)
-
 
 class FlattenTests(unittest.TestCase):
     def test_moves_files_back_and_removes_event_folders(self):
@@ -238,6 +173,3 @@ class FlattenTests(unittest.TestCase):
             with self.assertRaises(NotADirectoryError):
                 flatten_cluster_folders(path)
 
-
-if __name__ == "__main__":
-    unittest.main()

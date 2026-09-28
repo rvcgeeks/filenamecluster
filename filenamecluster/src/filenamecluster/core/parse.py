@@ -9,6 +9,9 @@ skip. The clock in the filename is used, never the filesystem dates.
 
 from __future__ import annotations
 
+import sys
+from filenamecluster.log import detail, trace_module
+
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -332,6 +335,14 @@ def scan_directory(directory: Path) -> FolderContents:
                 placed.extend(_files_inside_event_folder(entry))
         elif entry.is_file() and entry.name != MODEL_NAME:
             files.append(entry.name)
+    detail(
+        "directory_scanned",
+        path=str(folder),
+        files=len(files),
+        directories=len(directories),
+        placed=len(placed),
+        other_directories=[name for name in directories if not is_cluster_folder_name(name)],
+    )
     return FolderContents(tuple(files), tuple(directories), tuple(placed))
 
 
@@ -382,9 +393,19 @@ def _timestamp_from(name: str, patterns: CompiledTimestampPatterns) -> datetime 
         elif rule.kind == "date_only":
             found.extend(_date_only_matches(name, rule.pattern, patterns))
     if not found:
+        detail("timestamp_missing", name=name, rules=len(patterns.rules))
         return None
     found.sort(key=lambda item: (-item[0], item[1]))
-    return found[0][2]
+    priority, start, stamp = found[0]
+    detail(
+        "timestamp_chosen",
+        name=name,
+        candidates=len(found),
+        priority=priority,
+        start=start,
+        stamp=stamp.isoformat(sep=" "),
+    )
+    return stamp
 
 
 def _clock_matches(
@@ -469,6 +490,7 @@ def _millis_to_microseconds(text: str | None) -> int | None:
         return 0
     scale = {1: 100_000, 2: 10_000, 3: 1_000}.get(len(text))
     if scale is None:
+        detail("millis_rejected", digits=len(text))
         return None
     return int(text) * scale
 
@@ -485,10 +507,21 @@ def _make_datetime(
     max_year: int = 2100,
 ) -> datetime | None:
     if not min_year <= year <= max_year:
+        detail("timestamp_rejected", year=year, month=month, day=day, reason="year")
         return None
     try:
         return datetime(year, month, day, hour, minute, second, microsecond)
     except ValueError:
+        detail(
+            "timestamp_rejected",
+            year=year,
+            month=month,
+            day=day,
+            hour=hour,
+            minute=minute,
+            second=second,
+            reason="invalid",
+        )
         return None
 
 
@@ -496,7 +529,11 @@ def _from_epoch_millis(millis: int, min_year: int, max_year: int) -> datetime | 
     try:
         stamp = datetime.fromtimestamp(millis / 1000.0)
     except (OverflowError, OSError, ValueError):
+        detail("epoch_rejected", millis=millis, reason="overflow")
         return None
     if not min_year <= stamp.year <= max_year:
+        detail("epoch_rejected", millis=millis, year=stamp.year, reason="year")
         return None
     return stamp
+
+trace_module(sys.modules[__name__])

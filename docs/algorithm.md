@@ -48,7 +48,7 @@ fit(U):
     μ_w, σ_w² ← mean and variance of L, variance ≥ 0.05
     μ_b, σ_b² ← mean and variance of H, variance ≥ 0.05
     π_w ← 1/2
-    repeat 25 times:
+    repeat EM_ROUNDS times:                # learn.EM_ROUNDS, set to 25
         for each x in U:
             r_w(x) ← short-pattern share       # Bayes, in log space
             r_b(x) ← 1 − r_w(x)
@@ -114,9 +114,9 @@ Several methods are simpler than the two-component model but lose something impo
 
 **Mean or median times a constant.** Split when
 
-$$
+```math
 g_i > k\,\mathrm{median}(g).
-$$
+```
 
 This adapts to the overall pace, but the constant $k$ is still universal. It assumes one rhythm plus outliers rather than explicitly representing both within-event and between-event rhythms.
 
@@ -147,7 +147,7 @@ The complete cost is modest:
 - parsing and collecting $N$ timestamps: $O(N)$;
 - sorting: $O(N\log N)$;
 - making the gaps: $O(N)$;
-- 25 EM rounds over at most $N-1$ gaps: $O(25N)=O(N)$;
+- `EM_ROUNDS` EM rounds over at most $N-1$ gaps: $O(N)$, because `EM_ROUNDS` is a fixed setting, currently 25;
 - producing events: $O(N)$.
 
 Sorting therefore dominates the asymptotic running time. The model stores only the files, the gaps, the responsibilities, and a few parameters, so memory is $O(N)$.
@@ -217,9 +217,9 @@ Sort so that $t_1 \le t_2 \le \cdots \le t_N$, breaking ties by filename. The pa
 
 > **In simple words.** First we line up the photos like children by height, except here we line them up by time: the earliest photo stands first, the latest stands last. If two photos have exactly the same clock, we put them in alphabetical order of their names, so the line is always the same every time.
 
-$$
+```math
 g_i = \frac{t_{i+1} - t_i}{3600}, \qquad i = 1,\ldots,N-1.
-$$
+```
 
 > **In simple words.** Now we look at each photo and the one right after it, and ask “how long did we wait?” Clocks count in seconds, and there are 3600 seconds in one hour, so dividing by 3600 turns the wait into hours.
 >
@@ -227,7 +227,7 @@ $$
 >
 > Example: photos at 10:00, 10:30, and 16:30 give waits of 0.5 hours and 6 hours.
 
-Code: sort in `cluster.py` line 79; $g_i$ in `cluster.py` lines 85–88.
+Code: sort in `cluster.py` line 81; $g_i$ in `cluster.py` lines 87–90.
 
 Two safety limits are fixed before the fit. By default the floor is $F = 3$ hours and the ceiling is $C = 720$ hours (30 days), with $0 < F < C$.
 
@@ -238,13 +238,13 @@ Two safety limits are fixed before the fit. By default the floor is $F = 3$ hour
 >
 > The floor must be bigger than zero, and the ceiling must be bigger than the floor. Otherwise the rails would make no sense.
 
-Code: defaults in `cluster.py` lines 32–33; the check $0 < F < C$ in lines 35–39; conversion to hours in lines 41–47.
+Code: defaults in `cluster.py` lines 34–35; the check $0 < F < C$ in lines 37–41; conversion to hours in lines 43–49.
 
 The fit does not see bursts of a few seconds, and it does not see pauses already long enough to be a hard boundary. The training sample is
 
-$$
+```math
 \mathcal{U} = \{\ln g_i : F < g_i < C\}.
-$$
+```
 
 > **In simple words.** When you press the camera button ten times in a row, you get ten waits of one second each. Those tell us nothing about where outings begin and end, so we skip them. Waits longer than the ceiling are already decided, so we skip those too.
 >
@@ -263,22 +263,22 @@ $$
 >
 > Now “3 hours versus 10 hours” and “100 hours versus 330 hours” look like the same size of step, which is how people actually feel about waiting.
 
-Code: `cluster.py` lines 89–93. That list is passed to `fit_gap_model` at line 94.
+Code: `cluster.py` lines 91–95. That list is passed to `fit_gap_model` at line 96.
 
 #### Derivation: what a Gaussian on $\ln g$ means for $g$
 
 Gaps are positive and act multiplicatively: going from 3 h to 6 h feels like going from 30 h to 60 h. Put $x = \ln g$ and assume $x \sim \mathcal{N}(\mu,\sigma^2)$. Change variables with $g = e^{x}$, $dx/dg = 1/g$:
 
-$$
+```math
 p_g(g) = p_x(\ln g)\,\left|\frac{dx}{dg}\right|
 = \frac{1}{g\sqrt{2\pi\sigma^2}}\exp\!\left(-\frac{(\ln g-\mu)^2}{2\sigma^2}\right), \qquad g > 0.
-$$
+```
 
 That is the log-normal density. It is zero for $g \le 0$ and has a long right tail, which is the shape of real waiting times. Its median follows from $P(g \le m) = P(x \le \ln m) = \tfrac12$, which holds at $\ln m = \mu$:
 
-$$
+```math
 \mathrm{median}(g) = e^{\mu}.
-$$
+```
 
 This is why section 7 reports $e^{\mu_w}$ and $e^{\mu_b}$ as “typical” hours. They are medians, not means. The mean would be $e^{\mu+\sigma^2/2}$, which a few very long gaps pull upward.
 
@@ -305,13 +305,13 @@ flowchart TD
 
 Each training point $x \in \mathcal{U}$ is treated as a draw from a two-component Gaussian mixture
 
-$$
+```math
 p(x) = \pi_w\,\mathcal{N}(x;\mu_w,\sigma_w^2) + \pi_b\,\mathcal{N}(x;\mu_b,\sigma_b^2),
-$$
+```
 
-$$
+```math
 \pi_b = 1 - \pi_w, \qquad \pi_w \in (0,1).
-$$
+```
 
 > **In simple words.** A **Gaussian** is the smooth hill shape you get when you measure lots of similar things, like the heights of children in a class: most are near the middle, fewer are very short or very tall. It is also called a **bell curve** because it looks like a bell.
 >
@@ -334,11 +334,11 @@ $\mu_w$ is the short pattern (a pause inside an event). $\mu_b$ is the long patt
 >
 > $\mu_w$ is the middle of the short hill, and $\mu_b$ is the middle of the long hill.
 
-$$
+```math
 \mathcal{N}(x;\mu,\sigma^2)
 = \frac{1}{\sqrt{2\pi\sigma^2}}
 \exp\!\left(-\frac{(x-\mu)^2}{2\sigma^2}\right).
-$$
+```
 
 > **In simple words.** This is the exact shape of one bell. Read it as: “How tall is the hill at the spot $x$?”
 >
@@ -351,10 +351,10 @@ $$
 
 Its log is
 
-$$
+```math
 \log \mathcal{N}(x;\mu,\sigma^2)
 = -\frac12\left(\log(2\pi\sigma^2) + \frac{(x-\mu)^2}{\sigma^2}\right).
-$$
+```
 
 > **In simple words.** Computers get confused by numbers that are extremely tiny, like 0.000000000000001. Taking the log turns those into ordinary negative numbers, like −34, which the computer handles easily. Bigger log still means “more likely”, so comparisons still work.
 
@@ -364,11 +364,11 @@ Code: the log density is `_log_density` in `learn.py` lines 153–154. The expon
 
 Take $\log$ of the product. The log of a product is a sum, and $\log e^{y} = y$:
 
-$$
+```math
 \log \mathcal{N}(x;\mu,\sigma^2)
 = \log\!\left((2\pi\sigma^2)^{-1/2}\right) + \left(-\frac{(x-\mu)^2}{2\sigma^2}\right)
 = -\frac12\log(2\pi\sigma^2) - \frac{(x-\mu)^2}{2\sigma^2}.
-$$
+```
 
 Factor out $-\tfrac12$ to get the form above. Line 154 computes exactly this.
 
@@ -376,7 +376,7 @@ If $|\mathcal{U}| < 4$, the mixture is not fitted.
 
 > **In simple words.** $|\mathcal{U}|$ means “how many waits are in the learning pile”. With fewer than 4 examples you cannot honestly see two hills, just like you cannot tell the shape of a mountain range from 3 pebbles. So the app does not guess. It reuses what it learned before for this folder, or uses a simple backup rule (see section 7 and section 8).
 
-Code: `learn.py` lines 55–56 return `None`. The caller then either reuses a saved boundary or falls back, in `cluster.py` lines 94–105.
+Code: `learn.py` returns `None` when there are fewer than four gaps. The caller then either reuses a saved boundary or falls back, in `cluster.py` lines 96–107.
 
 ## 3. Initialisation
 
@@ -384,25 +384,25 @@ Code: `learn.py` lines 55–56 return `None`. The caller then either reuses a sa
 
 Sort $\mathcal{U}$ into $x_{(1)} \le \cdots \le x_{(n)}$ and cut it in half:
 
-$$
+```math
 L = \{x_{(1)},\ldots,x_{(\lfloor n/2 \rfloor)}\}, \qquad
 H = \{x_{(\lfloor n/2 \rfloor+1)},\ldots,x_{(n)}\},
-$$
+```
 
 > **In simple words.** Line up the learning waits from smallest to biggest. Cut the line in the middle. The smaller half is $L$ (low), the bigger half is $H$ (high). $\lfloor n/2 \rfloor$ means “half of $n$, rounded down”, so with 7 waits the low half gets 3 and the high half gets 4.
 
 with each half forced to contain at least one point. Then
 
-$$
+```math
 \mu_w^{(0)} = \frac{1}{|L|}\sum_{x\in L} x, \qquad
 \mu_b^{(0)} = \frac{1}{|H|}\sum_{x\in H} x,
-$$
+```
 
 > **In simple words.** The first guess for the middle of the short hill is the plain average of the low half. The first guess for the middle of the long hill is the plain average of the high half. $\sum$ means “add them all up”, and dividing by $|L|$ or $|H|$ (how many there are) makes it an average. The little $(0)$ means “guess number zero”, the very first try.
 
-$$
+```math
 \sigma_w^{2\,(0)} = \max\!\left(\frac{1}{|L|}\sum_{x\in L}(x-\mu_w^{(0)})^2,\; 0.05\right),
-$$
+```
 
 and the same for $\sigma_b^{2\,(0)}$ on $H$. The variance floor $0.05$ stops a run of identical gaps from collapsing a component to a spike. The starting weight is $\pi_w^{(0)} = 1/2$.
 
@@ -420,15 +420,15 @@ The split into halves is a design choice, not a derivation. It guarantees $\mu_w
 
 The mean and the variance with divisor $|L|$ (not $|L|-1$) are the maximum-likelihood estimates for one Gaussian fitted to $L$. With $\ell(\mu,v) = \sum_{x\in L}\left(-\tfrac12\log(2\pi v) - \tfrac{(x-\mu)^2}{2v}\right)$:
 
-$$
+```math
 \frac{\partial \ell}{\partial \mu} = \sum_{x\in L}\frac{x-\mu}{v} = 0
 \;\Rightarrow\; \mu = \frac{1}{|L|}\sum_{x\in L} x,
-$$
+```
 
-$$
+```math
 \frac{\partial \ell}{\partial v} = \sum_{x\in L}\left(-\frac{1}{2v} + \frac{(x-\mu)^2}{2v^2}\right) = 0
 \;\Rightarrow\; v = \frac{1}{|L|}\sum_{x\in L}(x-\mu)^2.
-$$
+```
 
 These are the special case of the EM updates in section 4 where every $r_w(x)$ is $1$ on $L$ and $0$ on $H$. `_variance` returns the floor directly when a half has fewer than two points, because one point has no spread.
 
@@ -443,13 +443,13 @@ These are the special case of the EM updates in section 4 where every $r_w(x)$ i
 
 For 25 iterations, the responsibility of the short component at an unlabeled point is the two-class posterior
 
-$$
+```math
 r_w(x)
 = \frac{\pi_w\,\mathcal{N}(x;\mu_w,\sigma_w^2)}
 {\pi_w\,\mathcal{N}(x;\mu_w,\sigma_w^2)+\pi_b\,\mathcal{N}(x;\mu_b,\sigma_b^2)}.
-$$
+```
 
-> **In simple words.** “25 iterations” means we play the two-step game 25 times.
+> **In simple words.** `EM_ROUNDS` is how many times we play the two-step game. It is set to 25 in `learn.py`.
 >
 > $r_w(x)$ is the **responsibility**: a number between 0 and 1 that says how much the short hill “owns” this wait.
 >
@@ -460,10 +460,10 @@ $$
 
 In log space, with $\ell_w = \log\mathcal{N}(x;\mu_w,\sigma_w^2)+\log\pi_w$ and $\ell_b$ defined the same way,
 
-$$
+```math
 r_w(x) = \frac{1}{1+\exp(\ell_b-\ell_w)}
 \quad\text{when }\ell_w \ge \ell_b,
-$$
+```
 
 and the symmetric form when $\ell_b$ is larger. Then $r_b(x) = 1-r_w(x)$.
 
@@ -479,39 +479,39 @@ Code: `_responsibility` in `learn.py` lines 136–150. $\ell_w$ and $\ell_b$ are
 
 Give each gap a hidden label $z \in \{w, b\}$ with prior $P(z=w) = \pi_w$ and likelihood $p(x \mid z=w) = \mathcal{N}(x;\mu_w,\sigma_w^2)$, and the same for $b$. The total probability of $x$ is the mixture:
 
-$$
+```math
 p(x) = P(z=w)\,p(x\mid z=w) + P(z=b)\,p(x\mid z=b).
-$$
+```
 
 Bayes’ rule, $P(z=w\mid x) = P(z=w)\,p(x\mid z=w)/p(x)$, gives $r_w(x)$ exactly as written above.
 
 For the log form, write $e^{\ell_w} = \pi_w\,\mathcal{N}(x;\mu_w,\sigma_w^2)$ and $e^{\ell_b} = \pi_b\,\mathcal{N}(x;\mu_b,\sigma_b^2)$. Divide the top and bottom by $e^{\ell_w}$:
 
-$$
+```math
 r_w(x) = \frac{e^{\ell_w}}{e^{\ell_w} + e^{\ell_b}}
 = \frac{1}{1 + e^{\ell_b - \ell_w}}.
-$$
+```
 
 Dividing by $e^{\ell_b}$ instead gives the other branch:
 
-$$
+```math
 r_w(x) = \frac{e^{\ell_w - \ell_b}}{1 + e^{\ell_w - \ell_b}}.
-$$
+```
 
 The code uses the first branch when $\ell_w \ge \ell_b$ and the second otherwise. In both branches the exponent is $\le 0$, so $e^{(\cdot)} \in (0,1]$. That is the whole reason for two branches: neither can overflow, even when $x$ is far from both centres and the raw densities underflow to $0$. Lines 144–147 also clamp the weights at $10^{-6}$ before taking the log, so $\log 0$ is never evaluated.
 
 The updates are the usual weighted mean, weighted variance, and weight, with the same variance floor:
 
-$$
+```math
 \pi_w \leftarrow \frac{\sum_x r_w(x)}{n}, \qquad
 \mu_w \leftarrow \frac{\sum_x r_w(x)\,x}{\sum_x r_w(x)},
-$$
+```
 
-$$
+```math
 \sigma_w^2 \leftarrow \max\!\left(
 \frac{\sum_x r_w(x)\,(x-\mu_w)^2}{\sum_x r_w(x)},\; 0.05
 \right),
-$$
+```
 
 > **In simple words.** The arrow $\leftarrow$ means “becomes”. Now each hill moves to fit the waits it owns.
 >
@@ -528,55 +528,55 @@ and likewise for the long component with $r_b$. If either total responsibility f
 > - If one hill ends up owning almost nothing (less than one millionth, which is $10^{-6}$), there is nothing left to learn about it, so we stop early.
 > - The names must not get mixed up. The “short” hill must always be the one on the left (smaller waits). If they ever cross over, we swap their labels back.
 
-Code: the loop of 25 iterations is `learn.py` line 67. Responsibilities for unlabeled and pinned points are lines 68–82. The stop at $10^{-6}$ is lines 84–88. The weighted means are lines 89–90, the weighted variances lines 91–100, and the weight line 101. The swap is lines 102–105.
+Code: the loop of `EM_ROUNDS` iterations is `learn.py`. Responsibilities for unlabeled and pinned points are lines 68–82. The stop at $10^{-6}$ is lines 84–88. The weighted means are lines 89–90, the weighted variances lines 91–100, and the weight line 101. The swap is lines 102–105.
 
 #### Derivation: the M-step updates
 
 Hold the responsibilities fixed and maximise the expected complete-data log-likelihood
 
-$$
+```math
 Q = \sum_{x}\Big( r_w(x)\big(\log\pi_w + \log\mathcal{N}(x;\mu_w,\sigma_w^2)\big)
 + r_b(x)\big(\log\pi_b + \log\mathcal{N}(x;\mu_b,\sigma_b^2)\big) \Big).
-$$
+```
 
 Write $R_w = \sum_x r_w(x)$ and $R_b = \sum_x r_b(x)$. Because $r_w + r_b = 1$ for every point, $R_w + R_b = n$.
 
 **Weight.** Only the $\log\pi$ terms depend on $\pi_w$, with $\pi_b = 1-\pi_w$:
 
-$$
+```math
 \frac{\partial Q}{\partial \pi_w} = \frac{R_w}{\pi_w} - \frac{R_b}{1-\pi_w} = 0
 \;\Rightarrow\; R_w(1-\pi_w) = R_b\,\pi_w
 \;\Rightarrow\; \pi_w = \frac{R_w}{R_w + R_b} = \frac{R_w}{n}.
-$$
+```
 
 Line 101 divides by `total`, which is $R_w + R_b$.
 
 **Centre.** Only $-(x-\mu_w)^2/(2\sigma_w^2)$ depends on $\mu_w$:
 
-$$
+```math
 \frac{\partial Q}{\partial \mu_w} = \sum_x r_w(x)\,\frac{x-\mu_w}{\sigma_w^2} = 0
 \;\Rightarrow\; \sum_x r_w(x)\,x = \mu_w \sum_x r_w(x)
 \;\Rightarrow\; \mu_w = \frac{\sum_x r_w(x)\,x}{R_w}.
-$$
+```
 
 **Width.** Put $v = \sigma_w^2$. The terms that depend on $v$ are $-\tfrac12\log v - (x-\mu_w)^2/(2v)$:
 
-$$
+```math
 \frac{\partial Q}{\partial v} = \sum_x r_w(x)\left(-\frac{1}{2v} + \frac{(x-\mu_w)^2}{2v^2}\right) = 0
 \;\Rightarrow\; v = \frac{\sum_x r_w(x)\,(x-\mu_w)^2}{R_w}.
-$$
+```
 
 The width uses the new $\mu_w$, which is what lines 91–95 do, because $\mu_w$ and $v$ are maximised jointly.
 
 **Why the floor is $\max(\cdot, 0.05)$.** Write $S = \sum_x r_w(x)(x-\mu_w)^2$. As a function of $v$ alone the objective is $f(v) = -\tfrac{R_w}{2}\log v - \tfrac{S}{2v}$, with
 
-$$
+```math
 f'(v) = \frac{S - R_w v}{2v^2}.
-$$
+```
 
 So $f$ rises while $v < S/R_w$ and falls after it. If $S/R_w < 0.05$, the best $v$ allowed in $v \ge 0.05$ is the edge $0.05$. The floor is therefore the exact constrained maximiser, not an ad-hoc clip.
 
-**Why the loop helps.** Each E-step followed by an M-step never decreases the mixture likelihood $\prod_x p(x)$. This is the standard EM guarantee. The code runs a fixed 25 rounds instead of testing for convergence.
+**Why the loop helps.** Each E-step followed by an M-step never decreases the mixture likelihood $\prod_x p(x)$. This is the standard EM guarantee. The code runs `EM_ROUNDS` rounds, 25 unless that variable is changed, instead of testing for convergence.
 
 **Why the swap is harmless.** Exchanging all $w$ and $b$ parameters leaves $p(x)$ unchanged, since the sum has two identical-looking terms. The swap only restores the naming convention $\mu_w \le \mu_b$.
 
@@ -584,13 +584,13 @@ So $f$ rises while $v < S/R_w$ and falls after it. If $S/R_w < 0.05$, the best $
 
 Write $(\mu_w,\sigma_w^2,\pi_w)$ and $(\mu_b,\sigma_b^2,\pi_b)$ for the values after the last iteration. The patterns are separated when both of these hold:
 
-$$
+```math
 \mu_b - \mu_w \ge 1, \qquad 0.05 < \pi_w < 0.95.
-$$
+```
 
 A difference of $1$ on the log-hour scale is a factor of $e$ in hours. A weight outside $(0.05, 0.95)$ means one pattern absorbed almost every pause, so the mixture did not actually find two rhythms.
 
-> **In simple words.** After 25 rounds we check: did we really find **two** different hills, or did we just cut one hill in half?
+> **In simple words.** After the `EM_ROUNDS` rounds we check: did we really find **two** different hills, or did we just cut one hill in half?
 >
 > Two tests must both pass:
 >
@@ -605,11 +605,11 @@ Code: `learn.py` line 107. The constant $1$ is `_SEPARATION` at line 18.
 
 Both thresholds are design choices, not derived. The translation into hours is one step. Section 1 showed $e^{\mu}$ is the median gap of a pattern, so
 
-$$
+```math
 \mu_b - \mu_w \ge 1
 \;\Longleftrightarrow\;
 \frac{e^{\mu_b}}{e^{\mu_w}} = e^{\mu_b - \mu_w} \ge e \approx 2.718.
-$$
+```
 
 The test means “the typical pause between events is at least about 2.7 times the typical pause inside one”.
 
@@ -621,10 +621,10 @@ The test means “the typical pause between events is at least about 2.7 times t
 
 The boundary $\tau$ is the log-gap at which the two components are equally likely,
 
-$$
+```math
 \log\mathcal{N}(\tau;\mu_w,\sigma_w^2)+\log\pi_w
 = \log\mathcal{N}(\tau;\mu_b,\sigma_b^2)+\log\pi_b,
-$$
+```
 
 > **In simple words.** Picture the two hills side by side. Walk from the left hill toward the right hill. At first, the short hill is taller where you stand. Later, the long hill is taller. There is exactly one spot in the valley between them where both hills are **the same height**. That spot is the boundary.
 >
@@ -632,13 +632,13 @@ $$
 
 and which lies strictly between the centres, $\mu_w < \tau < \mu_b$. Expanding and clearing the factor $-\tfrac12$ produces the quadratic $a\tau^2 + b\tau + c = 0$ with
 
-$$
+```math
 \begin{aligned}
 a &= \frac{1}{\sigma_w^2} - \frac{1}{\sigma_b^2}, \\
 b &= -\frac{2\mu_w}{\sigma_w^2} + \frac{2\mu_b}{\sigma_b^2}, \\
 c &= \frac{\mu_w^2}{\sigma_w^2} - \frac{\mu_b^2}{\sigma_b^2} + \log\frac{\sigma_w^2}{\sigma_b^2} - 2\log\frac{\pi_w}{\pi_b}.
 \end{aligned}
-$$
+```
 
 > **In simple words.** “Both hills the same height” can be rearranged into a school-style equation: $a\tau^2 + b\tau + c = 0$. This is called a **quadratic**, the same kind you meet in school when you learn the “minus b plus or minus” formula.
 >
@@ -650,9 +650,9 @@ $$
 
 The $2\pi$ terms cancel. If $|a| < 10^{-9}$ the equation is linear, $\tau = -c/b$ when $|b| > 10^{-9}$, otherwise the midpoint. If $a$ is not negligible and $b^2-4ac \ge 0$, both roots are
 
-$$
+```math
 \tau = \frac{-b \pm \sqrt{b^2-4ac}}{2a}.
-$$
+```
 
 The root used is the one inside $(\mu_w,\mu_b)$. If none is inside, $\tau = (\mu_w+\mu_b)/2$.
 
@@ -671,49 +671,49 @@ Code: `_boundary` in `learn.py` lines 157–188. The coefficients $a$, $b$, $c$ 
 
 **Step 2. Substitute the log density** from section 2 into both sides:
 
-$$
+```math
 -\tfrac12\log(2\pi\sigma_w^2) - \frac{(\tau-\mu_w)^2}{2\sigma_w^2} + \log\pi_w
 = -\tfrac12\log(2\pi\sigma_b^2) - \frac{(\tau-\mu_b)^2}{2\sigma_b^2} + \log\pi_b.
-$$
+```
 
 **Step 3. Multiply both sides by $-2$:**
 
-$$
+```math
 \log(2\pi\sigma_w^2) + \frac{(\tau-\mu_w)^2}{\sigma_w^2} - 2\log\pi_w
 = \log(2\pi\sigma_b^2) + \frac{(\tau-\mu_b)^2}{\sigma_b^2} - 2\log\pi_b.
-$$
+```
 
 **Step 4. Cancel $2\pi$ and collect logs.** $\log(2\pi\sigma_w^2) - \log(2\pi\sigma_b^2) = \log(\sigma_w^2/\sigma_b^2)$, and $2\log\pi_w - 2\log\pi_b = 2\log(\pi_w/\pi_b)$. Move everything to the left:
 
-$$
+```math
 \frac{(\tau-\mu_w)^2}{\sigma_w^2} - \frac{(\tau-\mu_b)^2}{\sigma_b^2}
 + \log\frac{\sigma_w^2}{\sigma_b^2} - 2\log\frac{\pi_w}{\pi_b} = 0.
-$$
+```
 
 **Step 5. Expand the squares** with $(\tau-\mu)^2 = \tau^2 - 2\mu\tau + \mu^2$, and group by powers of $\tau$:
 
-$$
+```math
 \tau^2\left(\frac{1}{\sigma_w^2} - \frac{1}{\sigma_b^2}\right)
 + \tau\left(\frac{2\mu_b}{\sigma_b^2} - \frac{2\mu_w}{\sigma_w^2}\right)
 + \left(\frac{\mu_w^2}{\sigma_w^2} - \frac{\mu_b^2}{\sigma_b^2} + \log\frac{\sigma_w^2}{\sigma_b^2} - 2\log\frac{\pi_w}{\pi_b}\right) = 0.
-$$
+```
 
 The three brackets are $a$, $b$, and $c$ as listed above.
 
 **Which side splits.** Step 3 multiplied $\ell_w - \ell_b$ by $-2$, so for any gap $x$
 
-$$
+```math
 a x^2 + b x + c = -2\big(\ell_w(x) - \ell_b(x)\big).
-$$
+```
 
 It is positive exactly when the long pattern is more likely. Between the centres, crossing $\tau$ from left to right is where that sign flips from “inside” to “between”.
 
 **Equal widths, the linear case.** If $\sigma_w^2 = \sigma_b^2 = \sigma^2$, then $a = 0$, $b = 2(\mu_b-\mu_w)/\sigma^2$, and $c = (\mu_w^2 - \mu_b^2)/\sigma^2 - 2\log(\pi_w/\pi_b)$. Using $\mu_w^2 - \mu_b^2 = -(\mu_b-\mu_w)(\mu_b+\mu_w)$:
 
-$$
+```math
 \tau = -\frac{c}{b}
 = \frac{\mu_w + \mu_b}{2} + \frac{\sigma^2}{\mu_b - \mu_w}\,\log\frac{\pi_w}{\pi_b}.
-$$
+```
 
 With equal weights the boundary is the midpoint. When inside-event pauses are more common ($\pi_w > \pi_b$), the boundary moves right, toward the long pattern: a pause has to be longer before it counts as a new event. The code uses $|a| < 10^{-9}$ as “equal widths” and falls back to the midpoint when $b$ is also negligible.
 
@@ -723,13 +723,13 @@ With equal weights the boundary is the midpoint. When inside-event pauses are mo
 
 If the mixture did not separate, let $\bar x$ and $s^2$ be the mean and variance of $\mathcal{U}$, and $s = \sqrt{\max(s^2, 0.05)}$.
 
-$$
+```math
 \tau =
 \begin{cases}
 \bar x - \tfrac12 s & \text{if }\bar x \ge \ln 18, \\
 \bar x + 2s & \text{if }\bar x < \ln 18.
 \end{cases}
-$$
+```
 
 A single rhythm whose typical pause is already 18 hours or more is treated as a repeated occasion: a pause of about that size starts a new event. A single short rhythm is one occasion: only an unusually long pause starts a new event.
 
@@ -748,13 +748,13 @@ Code: `learn.py` lines 117–127. $\bar x$ is line 119, $s$ is line 120, $\ln 18
 
 This rule is a design choice, not derived from a likelihood. With one pattern there is no second component to cross. What can be computed is what it does. If the log gaps in $\mathcal{U}$ are roughly Gaussian with mean $\bar x$ and standard deviation $s$, then with $\Phi$ the standard normal cumulative distribution:
 
-$$
+```math
 P\big(x > \bar x - \tfrac12 s\big) = 1 - \Phi(-0.5) = \Phi(0.5) \approx 0.69,
-$$
+```
 
-$$
+```math
 P\big(x > \bar x + 2s\big) = 1 - \Phi(2) \approx 0.023.
-$$
+```
 
 A long single rhythm splits at roughly 69% of its mid-range pauses, so most repeated occasions become separate events. A short single rhythm splits at roughly 2%, so only outliers start a new event. In hours, $e^{\tau} = e^{\bar x}\,e^{-s/2}$ or $e^{\bar x}\,e^{2s}$: the typical gap divided or multiplied by a spread factor. The switch point is $\ln 18 \approx 2.89$.
 
@@ -774,14 +774,14 @@ Code: `learn.py` lines 128–132.
 
 For every $g_i$, including those held out of $\mathcal{U}$,
 
-$$
+```math
 \mathrm{split}(g_i) =
 \begin{cases}
 \mathrm{false} & \text{if } g_i \le F, \\
 \mathrm{true} & \text{if } g_i \ge C, \\
 g_i \ge e^{\tau} & \text{otherwise.}
 \end{cases}
-$$
+```
 
 A new event starts at file $i+1$ exactly when $\mathrm{split}(g_i)$ is true. Equal timestamps give $g_i = 0$, which is never a split.
 
@@ -793,15 +793,15 @@ A new event starts at file $i+1$ exactly when $\mathrm{split}(g_i)$ is true. Equ
 >
 > “Split” means “start a new pile here”. Two photos with the exact same clock have a wait of 0, and 0 is less than the floor, so they always stay together.
 
-Code: `GapModel.splits` in `learn.py` lines 30–37. The walk that starts a new group is `cluster.py` lines 100–111. A zero gap fails `hours <= floor_hours` at `learn.py` line 33, so it does not split.
+Code: `GapModel.splits` in `learn.py`. The walk that starts a new group is `cluster.py` lines 102–113. A zero gap fails `hours <= floor_hours` in `GapModel.splits`, so it does not split.
 
 #### Why the comparison is done in hours
 
 $\tau$ was found on the log scale, but `splits` compares hours with `boundary_hours` $= e^{\tau}$. The two are the same test, because $\exp$ is strictly increasing and every $g_i > 0$ here (zero gaps are already caught by the floor):
 
-$$
+```math
 g_i \ge e^{\tau} \;\Longleftrightarrow\; \ln g_i \ge \tau.
-$$
+```
 
 For a gap between the two centres, $\ln g_i \ge \tau$ is the same as “the long pattern is at least as likely”, from the sign argument in section 6.1. The floor and the ceiling override that comparison at the two ends. The 36-hour fallback is a design constant.
 
@@ -824,38 +824,38 @@ flowchart TD
 
 When $|\mathcal{U}| < 4$ and this folder has no saved boundary, there is no $\tau$. The rule then is
 
-$$
+```math
 \mathrm{split}(g_i) = (g_i \ge C) \lor (g_i \ge 36).
-$$
+```
 
 > **In simple words.** If there were too few middle-sized waits to learn from, and we never learned anything for this folder before, we use a simple backup rule: “a wait of 36 hours (a day and a half) or more starts a new event”. The symbol $\lor$ means “or”. This keeps a day of photos and the next morning together, but splits a gap of two days.
 
-Code: `cluster.py` lines 102–105. The flowchart above is that branch together with `learn.py` lines 30–37.
+Code: `cluster.py` lines 104–107. The flowchart above is that branch together with `GapModel.splits`.
 
 ## 8. What is kept, and what the next batch does
 
 The fitted triple $(e^{\mu_w}, e^{\mu_b}, e^{\tau})$ and the flag $\mu_b-\mu_w \ge 1 \land 0.05 < \pi_w < 0.95$ are written in full floating-point precision. They are not rounded.
 
-> **In simple words.** After learning, the app writes a small note next to your photos, in a file called `filenamecluster-model.json`. It holds four things:
+> **In simple words.** After learning, the app writes a small note next to your photos, in a file called `filenamecluster-model.json`. The learned part holds four things:
 >
 > - the typical wait inside an event, in hours,
 > - the typical wait between events, in hours,
 > - the boundary, in hours,
 > - a yes/no flag that says whether two real hills were found (the tests from section 5; $\land$ means “and”).
 >
-> The numbers are saved with every digit the computer has, like `37.98317023002044`, not chopped to `37.98`. A model is only as good as its numbers, so nothing is thrown away.
+> The numbers are saved with every digit the computer has, like `37.98317023002044`, not chopped to `37.98`. A model is only as good as its numbers, so nothing is thrown away. Beside that learned note, the same file stores the options used for the folder: the safety limits, the year window, the priorities, and the filename patterns. Those options are loaded over the built-in defaults the next time the folder is chosen. They do not change how the boundary is fitted or reused.
 
-Code: the four fields are `GapModel` in `learn.py`. The write, with no rounding, is `_learned_document` in the same module, called from `save_model`. The Options tab shows the same four fields, `learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, and `learned.separated`, in a read-only table. The numbers are formatted with `json.dumps`, so they match the file. When no boundary was fitted, each value is `null`.
+Code: the four learned fields are `GapModel` in `learn.py`. The write, with no rounding, is `_learned_document` in the same module, called from `save_model`. The same write stores `options` through `_options_document`. The Options tab shows the four learned fields, `learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, and `learned.separated`, in a read-only table. The numbers are formatted with `json.dumps`, so they match the file. When no boundary was fitted, each value is `null`. A missing or unusable `options` object leaves the defaults in place and keeps a valid `learned` object.
 
 On a later scan the sequence is rebuilt from every timestamped file in the chosen folder and inside existing event folders, sorted again as one series. $\mathcal{U}$ is recomputed from that series.
 
 > **In simple words.** Later, you copy some new photos into the same folder and look again. The app does not forget the old photos. It collects **all** of them: the new loose photos, and the photos already sitting inside event folders from last time. It lines them all up again, from the beginning, as one long line, and measures every wait again.
 
-Code: loose files and files already inside event folders are collected in `pipeline.py` lines 49–65, then sorted inside `cluster_files` (`cluster.py` line 79). $\mathcal{U}$ is rebuilt at `cluster.py` lines 89–93.
+Code: loose files and files already inside event folders are collected in `pipeline.py` lines 81–96, then sorted inside `cluster_files` (`cluster.py` line 81). $\mathcal{U}$ is rebuilt at `cluster.py` lines 91–95.
 
-- If $|\mathcal{U}| \ge 4$, $\tau$ is fitted again from the whole series. The previous numbers are replaced. Code: `cluster.py` line 94, then `pipeline.py` lines 66–67.
-- If $|\mathcal{U}| < 4$ and a boundary was saved, that saved $\tau$ is used in the decision rule above. Code: `cluster.py` lines 95–98, loaded earlier by `pipeline.py` line 49.
-- If $|\mathcal{U}| < 4$ and nothing was saved, the 36-hour fallback is used. Code: `cluster.py` lines 102–105.
+- If $|\mathcal{U}| \ge 4$, $\tau$ is fitted again from the whole series. The previous numbers are replaced. Code: `cluster.py` line 96, then `pipeline.py` lines 99–104.
+- If $|\mathcal{U}| < 4$ and a boundary was saved, that saved $\tau$ is used in the decision rule above. Code: `cluster.py` lines 97–100, loaded earlier by `pipeline.py` line 76.
+- If $|\mathcal{U}| < 4$ and nothing was saved, the 36-hour fallback is used. Code: `cluster.py` lines 104–107.
 
 > **In simple words.** Then one of three things happens:
 >
@@ -865,39 +865,276 @@ Code: loose files and files already inside event folders are collected in `pipel
 >
 > Because of this, a new photo taken during an old trip can **join** that trip’s pile, and a new photo from a new day out can **start** a new pile.
 
-The saved boundary is a parameter of the decision rule. It is not a prior inside the EM update. `fit_gap_model` at `cluster.py` line 94 receives only the new unlabeled log gaps. The saved model is assigned only when that fit returns `None`, at lines 95–98.
+The saved boundary is a parameter of the decision rule. It is not a prior inside the EM update. `fit_gap_model` at `cluster.py` line 96 receives only the new unlabeled log gaps. The saved model is assigned only when that fit returns `None`, at lines 97–100. The options saved beside it are not passed into `fit_gap_model`.
 
 > **In simple words.** The old note is only a **backup answer**. It does not push or bend the new learning. When there are enough waits, the app learns fresh from the photos, exactly as if it had never seen the note. The note is only picked up when the fresh learning says “I don’t have enough examples”.
 
-## A tiny worked example
+## Worked example: an actual dry run
 
-> Suppose a folder has these eight photos (times on the same calendar, 2024):
->
-> | Photo | Clock |
-> |---|---|
-> | 1 | 1 Jan 10:00 |
-> | 2 | 1 Jan 10:00:05 |
-> | 3 | 1 Jan 15:00 |
-> | 4 | 1 Jan 21:00 |
-> | 5 | 4 Jan 09:00 |
-> | 6 | 4 Jan 17:00 |
-> | 7 | 9 Jan 12:00 |
-> | 8 | 9 Jan 18:00 |
->
-> **Step 1, waits in hours:** 0.0014, 5, 6, 60, 8, 115, 6.
->
-> **Step 2, rails:** 0.0014 is below the 3-hour floor, so it is not used for learning. Nothing is above 720 hours. The learning pile is 5, 6, 60, 8, 115, 6.
->
-> **Step 3, logs:** about 1.61, 1.79, 4.09, 2.08, 4.74, 1.79.
->
-> **Step 4, two hills:** the short hill sits around 1.8 (about 6 hours), and the long hill sits around 4.4 (about 83 hours). They are more than 1 step apart, and each owns a fair share, so they are **separated**.
->
-> **Step 5, boundary:** somewhere in the valley between about 6 hours and about 83 hours. The app computes about 18.3 hours.
->
-> **Step 6, walk:** the 60-hour wait and the 115-hour wait are past the boundary, so they start new piles. Everything else stays together. The result is three events:
->
-> - Event 1: photos 1 to 4 (1 January).
-> - Event 2: photos 5 and 6 (4 January).
-> - Event 3: photos 7 and 8 (9 January).
->
-> These numbers are rounded here only so they are easy to read. The app itself keeps every digit.
+This section executes the pseudocode above with `EM_ROUNDS` left at 25, including all 25 EM iterations. It does not replace calculations with descriptions such as “two hills appear” or “the boundary is somewhere in the valley”.
+
+Decimal values in backticks are the complete values returned by Python's `repr(float)` in the running implementation. They are not shortened for this document. Operations such as $\ln(5)$ do not have finite decimal expansions, so the exact mathematical input is shown beside the actual IEEE-754 value used by the program.
+
+### Input to `cluster`
+
+Use the default rails $F=3$ hours and $C=720$ hours, no saved model, and these eight already-sorted files:
+
+| File | Timestamp |
+|---:|---|
+| 1 | 2024-01-01 10:00:00 |
+| 2 | 2024-01-01 10:00:05 |
+| 3 | 2024-01-01 15:00:05 |
+| 4 | 2024-01-01 21:00:05 |
+| 5 | 2024-01-04 09:00:05 |
+| 6 | 2024-01-04 17:00:05 |
+| 7 | 2024-01-09 12:00:05 |
+| 8 | 2024-01-09 18:00:05 |
+
+The pseudocode line
+
+```math
+g_i=(t_{i+1}-t_i)/3600
+```
+
+produces:
+
+| $i$ | Seconds | Division | Actual $g_i$ |
+|---:|---:|---:|---:|
+| 1 | 5 | $5/3600$ | `0.001388888888888889` |
+| 2 | 18000 | $18000/3600$ | `5.0` |
+| 3 | 21600 | $21600/3600$ | `6.0` |
+| 4 | 216000 | $216000/3600$ | `60.0` |
+| 5 | 28800 | $28800/3600$ | `8.0` |
+| 6 | 414000 | $414000/3600$ | `115.0` |
+| 7 | 21600 | $21600/3600$ | `6.0` |
+
+The comprehension `F < g_i < C` rejects only $g_1$, because `3 < 0.001388888888888889 < 720` is false. It accepts the other six gaps. Applying `math.log` gives the actual `U` list, in input order:
+
+```text
+[
+    1.6094379124341003,  # log(5)
+    1.791759469228055,   # log(6)
+    4.0943445622221,     # log(60)
+    2.0794415416798357,  # log(8)
+    4.74493212836325,    # log(115)
+    1.791759469228055,   # log(6)
+]
+```
+
+There are six samples, so `|U| < 4` is false and `fit(U)` continues.
+
+### Initial values in `fit`
+
+Sorting and splitting at `len(ordered) // 2 = 3` gives:
+
+```text
+L = [1.6094379124341003, 1.791759469228055, 1.791759469228055]
+H = [2.0794415416798357, 4.0943445622221, 4.74493212836325]
+```
+
+The initial short mean is calculated, not inferred:
+
+```math
+\mu_w^{(0)}
+=\frac{1.6094379124341003+1.791759469228055+1.791759469228055}{3}
+=1.7309856169634035.
+```
+
+Its raw population variance is less than `0.05`, so the code applies the variance floor:
+
+```math
+\sigma_w^{2(0)}
+=\max\!\left(
+\frac{
+(1.6094379124341003-1.7309856169634035)^2+
+(1.791759469228055-1.7309856169634035)^2+
+(1.791759469228055-1.7309856169634035)^2
+}{3},
+0.05\right)
+=0.05.
+```
+
+The initial long parameters are:
+
+```math
+\mu_b^{(0)}
+=\frac{2.0794415416798357+4.0943445622221+4.74493212836325}{3}
+=3.6395727440883956,
+```
+
+```math
+\sigma_b^{2(0)}
+=\max\!\left(
+\frac{
+(2.0794415416798357-3.6395727440883956)^2+
+(4.0943445622221-3.6395727440883956)^2+
+(4.74493212836325-3.6395727440883956)^2
+}{3},
+0.05\right)
+=1.2875487145673.
+```
+
+The final initial value is $\pi_w^{(0)}=0.5$.
+
+### Iteration 0: E-step
+
+For each $x$, the code calculates
+
+```math
+\ell_w(x)=-\tfrac12\left[\log(2\pi\sigma_w^2)
++\frac{(x-\mu_w)^2}{\sigma_w^2}\right]+\log\pi_w
+```
+
+and the corresponding $\ell_b(x)$, then evaluates the stable logistic branch in `_responsibility`. Substituting the initial parameters produces:
+
+| $x$ | $r_w(x)$ | $r_b(x)=1-r_w(x)$ |
+|---:|---:|---:|
+| `1.6094379124341003` | `0.9559339569000249` | `0.04406604309997508` |
+| `1.791759469228055` | `0.9484969444792334` | `0.051503055520766616` |
+| `4.0943445622221` | `3.0402441436766084e-24` | `1.0` |
+| `2.0794415416798357` | `0.7949836000777135` | `0.20501639992228649` |
+| `4.74493212836325` | `2.8886640492576112e-39` | `1.0` |
+| `1.791759469228055` | `0.9484969444792334` | `0.051503055520766616` |
+
+No value is pinned in this example. The responsibility totals are:
+
+```math
+R_w=3.6479114459362054,\qquad R_b=2.352088554063795.
+```
+
+Both are greater than $10^{-6}$, so the collapse test is false.
+
+### Iteration 0: M-step
+
+The weighted numerators and means are:
+
+```math
+\sum_x r_w(x)x=6.590595038582919,\qquad
+\mu_w=\frac{6.590595038582919}{3.6479114459362054}
+=1.8066762683959556,
+```
+
+```math
+\sum_x r_b(x)x=9.521080044572479,\qquad
+\mu_b=\frac{9.521080044572479}{2.352088554063795}
+=4.047925843660324.
+```
+
+The unbounded short variance is `0.026524290187688888`; therefore
+
+```math
+\sigma_w^2=\max(0.026524290187688888,0.05)=0.05.
+```
+
+The long variance and new weight are:
+
+```math
+\sigma_b^2=0.8795391309598668,\qquad
+\pi_w=\frac{3.6479114459362054}{3.6479114459362054+2.352088554063795}
+=0.6079852409893676.
+```
+
+Because `1.8066762683959556 > 4.047925843660324` is false, the swap branch is not taken.
+
+### All 25 M-step results
+
+Each row is the state after that numbered loop iteration. The code deliberately continues to iteration 24 even after the floating-point state stops changing.
+
+| Iteration | $\mu_w$ | $\sigma_w^2$ | $\mu_b$ | $\sigma_b^2$ | $\pi_w$ |
+|---:|---:|---:|---:|---:|---:|
+| 0 | `1.8066762683959556` | `0.05` | `4.047925843660324` | `0.8795391309598668` | `0.6079852409893676` |
+| 1 | `1.8163297278702146` | `0.05` | `4.34836781494306` | `0.2756130114623709` | `0.656818174619075` |
+| 2 | `1.8180970868839337` | `0.05` | `4.419587848653665` | `0.10593343281007417` | `0.6666595529049494` |
+| 3 | `1.818099598142247` | `0.05` | `4.419638345287934` | `0.10581604531524803` | `0.6666666666659915` |
+| 4 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 5 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 6 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 7 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 8 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 9 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 10 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 11 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 12 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 13 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 14 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 15 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 16 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 17 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 18 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 19 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 20 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 21 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 22 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 23 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+| 24 | `1.8180995981422547` | `0.05` | `4.419638345288072` | `0.1058160453149344` | `0.6666666666660109` |
+
+### Separation test and boundary calculation
+
+The two Boolean conditions are evaluated directly:
+
+```math
+\mu_b-\mu_w
+=4.419638345288072-1.8180995981422547
+=2.601538747145817 \ge 1,
+```
+
+```math
+0.05 < 0.6666666666660109 < 0.95.
+```
+
+Both are true, so `separated = True` and `_boundary` uses the two-component equation. Substitution into the coefficient formulas gives:
+
+```text
+a = 10.54963737282228
+b = 10.810386162213746
+c = -120.62210314034427
+b*b - 4*a*c = 5206.942238087381
+```
+
+The quadratic formula returns both actual roots:
+
+```text
+-3.9323404418837375
+ 2.9076240672656675
+```
+
+The code tests the open interval
+
+```text
+1.8180995981422547 < root < 4.419638345288072
+```
+
+and therefore selects $\tau=2.9076240672656675$. Exponentiating the final parameters exactly as the implementation does returns:
+
+```text
+within_hours  = 6.1601405764804635
+between_hours = 83.06623862879836
+boundary_hours = 18.31323581997619
+separated = True
+```
+
+### Final execution of `split` and `cluster`
+
+The loop now applies the three branches of `split(g, model, F, C)` to every original gap:
+
+| Gap | `g <= 3` | `g >= 720` | `g >= 18.31323581997619` | Result |
+|---:|:---:|:---:|:---:|:---|
+| `0.001388888888888889` | true | not evaluated | not evaluated | append file 2 |
+| `5.0` | false | false | false | append file 3 |
+| `6.0` | false | false | false | append file 4 |
+| `60.0` | false | false | true | start group with file 5 |
+| `8.0` | false | false | false | append file 6 |
+| `115.0` | false | false | true | start group with file 7 |
+| `6.0` | false | false | false | append file 8 |
+
+The returned groups are therefore:
+
+```text
+[
+    [file 1, file 2, file 3, file 4],
+    [file 5, file 6],
+    [file 7, file 8],
+]
+```
+
+No qualitative choice or manually selected cutoff appears in this dry run: the only two new groups are produced by the literal comparisons `60.0 >= 18.31323581997619` and `115.0 >= 18.31323581997619`.

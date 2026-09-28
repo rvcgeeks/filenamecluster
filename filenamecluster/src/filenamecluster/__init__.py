@@ -7,3 +7,8 @@ Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 Introduction: ``readme.md``. Mathematics: ``docs/algorithm.md``.
 Design: ``docs/architecture.md``.
 """
+
+import sys
+from filenamecluster.log import trace_module
+
+trace_module(sys.modules[__name__])

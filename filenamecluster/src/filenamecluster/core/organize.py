@@ -13,6 +13,9 @@ The number is the chronological position, starting at 1.
 
 from __future__ import annotations
 
+import sys
+from filenamecluster.log import detail, trace_module
+
 import shutil
 from dataclasses import dataclass
 from datetime import datetime
@@ -75,26 +78,33 @@ def move_into_cluster_folders(
     directory = Path(root)
     if not directory.is_dir():
         raise NotADirectoryError(directory)
+    detail("move_started", path=str(directory), events=len(clusters))
 
     created: list[Path] = []
     kept: set[Path] = set()
     for cluster in clusters:
         folder = directory / cluster.name
         folder.mkdir(exist_ok=True)
+        detail("event_folder_ready", name=cluster.name, files=len(cluster.files))
         created.append(folder)
         kept.add(folder.resolve())
         for item in cluster.files:
             filename = _single_component(item.name)
             source = _source_path(directory, item, filename)
             if not source.is_file():
+                detail("move_missing", source=str(source))
                 raise FileNotFoundError(source)
             target = folder / filename
             if _same_file(source, target):
+                detail("file_already_placed", path=str(target))
                 continue
             if target.exists():
+                detail("move_blocked", source=str(source), target=str(target))
                 raise FileExistsError(target)
             shutil.move(str(source), str(target))
+            detail("file_moved", source=str(source), target=str(target))
     _remove_empty_event_folders(directory, kept)
+    detail("move_finished", folders=len(created))
     return created
 
 
@@ -109,6 +119,7 @@ def flatten_cluster_folders(root: Path | str) -> int:
     directory = Path(root)
     if not directory.is_dir():
         raise NotADirectoryError(directory)
+    detail("flatten_started", path=str(directory))
 
     folders = [
         entry
@@ -122,15 +133,21 @@ def flatten_cluster_folders(root: Path | str) -> int:
                 continue
             target = directory / _single_component(entry.name)
             if target.exists():
+                detail("flatten_blocked", source=str(entry), target=str(target))
                 raise FileExistsError(target)
             moves.append((entry, target))
+    detail("flatten_planned", files=len(moves), folders=len(folders))
     for source, target in moves:
         shutil.move(source, target)
+        detail("file_moved", source=str(source), target=str(target))
     for folder in folders:
         try:
             folder.rmdir()
+            detail("event_folder_removed", name=folder.name)
         except OSError:
+            detail("event_folder_kept", name=folder.name)
             continue
+    detail("flatten_finished", moved=len(moves))
     return len(moves)
 
 
@@ -170,8 +187,13 @@ def _remove_empty_event_folders(directory: Path, kept: set[Path]) -> None:
         if not entry.is_dir() or not is_cluster_folder_name(entry.name):
             continue
         if entry.resolve() in kept:
+            detail("event_folder_kept", name=entry.name, reason="still_used")
             continue
         try:
             entry.rmdir()
+            detail("event_folder_removed", name=entry.name)
         except OSError:
+            detail("event_folder_kept", name=entry.name, reason="not_empty")
             continue
+
+trace_module(sys.modules[__name__])

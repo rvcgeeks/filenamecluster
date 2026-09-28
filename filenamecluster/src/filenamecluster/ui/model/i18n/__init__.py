@@ -7,6 +7,9 @@ Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 
 from __future__ import annotations
 
+import sys
+from filenamecluster.log import trace_module
+
 import json
 import string
 from pathlib import Path
@@ -81,3 +84,5 @@ def t(key: str, **kwargs: object) -> str:
 
 def file_count(count: int) -> str:
     return t("file_one", n=count) if count == 1 else t("file_many", n=count)
+
+trace_module(sys.modules[__name__])

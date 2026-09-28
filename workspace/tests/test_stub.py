@@ -112,6 +112,19 @@ def test_camera_roll_listing_parses_without_creating_files() -> None:
     names, ignored_dirs, mode = stub._names_from_listing(lines)
     assert mode == "dir"
     assert ignored_dirs == 4
-    assert len(names) == 9370
+    assert len(names) == 11484
+    assert "BeautyPlus_20160406180905_save.jpg" in names
+    assert not any("marksheet" in name or "scholarship" in name for name in names)
+    assert "InShot_20240127_220124404.mp4" in names
+    assert "Project_12_02_2023-12-03-01-32-06.mp4" in names
+    assert "PhotoGrid_1581064265269.jpg" in names
+    assert "IMG-20170610-WA0005.jpg" in names
+    assert "VID-20231230-WA0013.mp4" in names
+    assert "Screenshot_2019-08-14-09-26-13-264_lockscreen.png" in names
+    assert "IMG_20200317_150503_BURST1.jpg" in names
+    assert "VID_20201116_172025_HSR_120.mp4" in names
+    assert "VID_20210401_142601_exported_16951.jpg" in names
+    assert "IMG_20210526_214754_HHT.jpg" in names
     assert "20200101_001000.mp4" in names
-    assert "DaSr70bB1F3XK9Kf8Q0040Q8.jpg" in names
+    assert "img1462863402727.jpg" in names
+    assert "CamScanner 11-21-2024 12.22.jpg" in names

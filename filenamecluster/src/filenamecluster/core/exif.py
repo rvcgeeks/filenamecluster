@@ -11,6 +11,9 @@ Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 
 from __future__ import annotations
 
+import sys
+from filenamecluster.log import detail, trace_module
+
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -66,23 +69,51 @@ def read_exif_timestamp(
     file = Path(path)
     try:
         if not file.is_file():
+            detail("metadata_skipped", path=str(file), reason="not_a_file")
             return None
         with file.open("rb") as handle:
             header = handle.read(16)
             handle.seek(0)
             if _is_video(header):
-                return _video_timestamp(handle, min_year, max_year)
+                stamp = _video_timestamp(handle, min_year, max_year)
+                detail(
+                    "metadata_clock",
+                    path=file.name,
+                    kind="video",
+                    found=stamp is not None,
+                    stamp=None if stamp is None else stamp.isoformat(sep=" "),
+                )
+                return stamp
             if header.startswith(b"%PDF-"):
-                return _pdf_timestamp(handle, min_year, max_year)
+                stamp = _pdf_timestamp(handle, min_year, max_year)
+                detail(
+                    "metadata_clock",
+                    path=file.name,
+                    kind="pdf",
+                    found=stamp is not None,
+                    stamp=None if stamp is None else stamp.isoformat(sep=" "),
+                )
+                return stamp
             payload = _exif_payload(handle, header)
-    except Exception:
+    except Exception:  # noqa: BLE001  # a damaged container must not stop the scan
+        detail("metadata_skipped", path=file.name, reason="unreadable")
         return None
     if not payload:
+        detail("metadata_skipped", path=file.name, reason="no_exif")
         return None
     try:
-        return _datetime_from_tiff(payload, min_year, max_year)
-    except Exception:
+        stamp = _datetime_from_tiff(payload, min_year, max_year)
+    except Exception:  # noqa: BLE001  # a damaged container must not stop the scan
+        detail("metadata_skipped", path=file.name, reason="bad_exif")
         return None
+    detail(
+        "metadata_clock",
+        path=file.name,
+        kind="exif",
+        found=stamp is not None,
+        stamp=None if stamp is None else stamp.isoformat(sep=" "),
+    )
+    return stamp
 
 
 def _exif_payload(handle, header: bytes) -> bytes | None:
@@ -570,3 +601,5 @@ def _u32(data: bytes, offset: int, order: str) -> int | None:
     if offset < 0 or offset + 4 > len(data):
         return None
     return int.from_bytes(data[offset : offset + 4], order)
+
+trace_module(sys.modules[__name__])

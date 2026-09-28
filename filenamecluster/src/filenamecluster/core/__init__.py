@@ -5,6 +5,9 @@ Introduction: ``readme.md``. Mathematics: ``docs/algorithm.md``.
 Design: ``docs/architecture.md``.
 """
 
+import sys
+from filenamecluster.log import trace_module
+
 from filenamecluster.core.cluster import Cluster, ClusterParams, cluster_files
 from filenamecluster.core.organize import (
     NamedCluster,
@@ -37,3 +40,5 @@ __all__ = [
     "parse_timestamp",
     "scan_directory",
 ]
+
+trace_module(sys.modules[__name__])
