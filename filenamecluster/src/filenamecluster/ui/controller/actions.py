@@ -565,7 +565,7 @@ class AppController:
         self.view.retranslate()
 
     def _logging_toggled(self) -> None:
-        """Apply the Options switch. Logging starts on."""
+        """Apply the Options switch. Logging starts off."""
 
         set_logging_enabled(bool(self.view.logging_var.get()))
 

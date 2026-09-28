@@ -5,6 +5,7 @@ a function runs, ``ENTER`` as it begins, and ``EXIT`` when it returns.
 ``EVENT`` marks a key step such as saving the model. ``DETAIL`` records a
 decision or an intermediate value inside a function.
 
+Logging is off until Options, Write application log, is turned on.
 The file lives where this operating system keeps application logs:
 
 - macOS: ``~/Library/Logs/filenamecluster/filenamecluster.log``
@@ -28,7 +29,7 @@ from typing import TypeVar
 
 _LOGGER_NAME = "filenamecluster"
 _STATE: dict[str, str | None] = {"path": None}
-_ENABLED = True
+_ENABLED = False
 _LOCAL = threading.local()
 _F = TypeVar("_F", bound=Callable[..., object])
 
@@ -91,7 +92,7 @@ def configure() -> Path:
 
 
 def logging_enabled() -> bool:
-    """Whether new lines are written. The application starts with this on."""
+    """Whether new lines are written. The application starts with this off."""
 
     return _ENABLED
 

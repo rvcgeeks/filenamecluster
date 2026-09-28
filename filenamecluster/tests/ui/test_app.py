@@ -62,6 +62,7 @@ def make_root() -> tk.Tk:
 class AppTests(unittest.TestCase):
     def setUp(self):
         set_language("en")
+        set_logging_enabled(False)
         self.tmp = TemporaryDirectory()
         self.folder = Path(self.tmp.name)
         for name in PHOTOS:
@@ -73,7 +74,7 @@ class AppTests(unittest.TestCase):
 
     def tearDown(self):
         set_language("en")
-        set_logging_enabled(True)
+        set_logging_enabled(False)
         theme.use_script(self.root, self.app.fonts, "en")
         self.assertEqual(self.root.state(), "withdrawn")
         self.root.destroy()
@@ -96,16 +97,16 @@ class AppTests(unittest.TestCase):
         self.assertIn("pid=", about)
         self.assertIn(str(log_path()), about)
 
-    def test_options_logging_switch_starts_on(self):
+    def test_options_logging_switch_starts_off(self):
         self.assertEqual(self.app.logging_switch.cget("text"), "Write application log")
-        self.assertTrue(self.app.logging_var.get())
-        self.assertTrue(logging_enabled())
-        self.app.logging_var.set(False)
-        self.app._logging_toggled()
+        self.assertFalse(self.app.logging_var.get())
         self.assertFalse(logging_enabled())
         self.app.logging_var.set(True)
         self.app._logging_toggled()
         self.assertTrue(logging_enabled())
+        self.app.logging_var.set(False)
+        self.app._logging_toggled()
+        self.assertFalse(logging_enabled())
 
     def test_choosing_a_folder_previews_without_moving(self):
         with patch.object(action_module.filedialog, "askdirectory", return_value=str(self.folder)):

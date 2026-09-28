@@ -10,8 +10,11 @@ from filenamecluster.core.learn import model_path
 
 
 class LogTests(unittest.TestCase):
+    def setUp(self):
+        logmod.set_logging_enabled(False)
+
     def tearDown(self):
-        logmod.set_logging_enabled(True)
+        logmod.set_logging_enabled(False)
         logmod._STATE["path"] = None
         logger = logging.getLogger("filenamecluster")
         for handler in list(logger.handlers):
@@ -73,12 +76,14 @@ class LogTests(unittest.TestCase):
         sample.__module__ = "filenamecluster.tests"
         wrapped = logmod.traced(sample)
         with patch.object(logmod, "log_path", return_value=target):
+            logmod.set_logging_enabled(True)
             logmod.event("unit", path=target)
             logmod.detail("sample_step", value=1)
             logmod.log_call("filenamecluster.tests.sample")
             self.assertEqual(wrapped(1), 2)
             with self.assertRaises(RuntimeError):
                 wrapped(-1)
+            logmod.set_logging_enabled(False)
         text = target.read_text(encoding="utf-8")
         self.assertIn("EVENT logging_started", text)
         self.assertIn("EVENT unit", text)
@@ -93,20 +98,25 @@ class LogTests(unittest.TestCase):
     def test_the_switch_stops_new_lines_until_it_is_turned_on_again(self):
         target = Path(self._tmp()) / "app.log"
         with patch.object(logmod, "log_path", return_value=target):
-            self.assertTrue(logmod.logging_enabled())
+            self.assertFalse(logmod.logging_enabled())
+            logmod.event("hidden_before")
+            logmod.set_logging_enabled(True)
             logmod.event("before")
             logmod.set_logging_enabled(False)
             logmod.event("hidden")
             logmod.detail("hidden_detail")
             logmod.set_logging_enabled(True)
             logmod.event("after")
+            logmod.set_logging_enabled(False)
         text = target.read_text(encoding="utf-8")
+        self.assertNotIn("hidden_before", text)
         self.assertIn("EVENT before", text)
         self.assertIn("EVENT logging_disabled", text)
-        self.assertNotIn("hidden", text)
+        self.assertNotIn("EVENT hidden", text)
+        self.assertNotIn("hidden_detail", text)
         self.assertIn("EVENT logging_enabled", text)
         self.assertIn("EVENT after", text)
-        self.assertTrue(logmod.logging_enabled())
+        self.assertFalse(logmod.logging_enabled())
 
     def test_tracing_still_runs_when_the_log_cannot_be_opened(self):
         def sample() -> str:
@@ -118,7 +128,9 @@ class LogTests(unittest.TestCase):
             patch.object(logmod, "log_path", return_value=Path("/no/such/dir/app.log")),
             patch.object(Path, "mkdir", side_effect=OSError("denied")),
         ):
+            logmod.set_logging_enabled(True)
             self.assertEqual(wrapped(), "ok")
+            logmod.set_logging_enabled(False)
 
     def test_module_functions_are_traced(self):
         self.assertTrue(getattr(model_path, "_filenamecluster_traced", False))

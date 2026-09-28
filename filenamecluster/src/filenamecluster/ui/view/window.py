@@ -73,7 +73,7 @@ class AppView:
         self.language_var = tk.StringVar(
             root, next(name for code, name in LANGUAGES if code == language())
         )
-        self.logging_var = tk.BooleanVar(root, True)
+        self.logging_var = tk.BooleanVar(root, False)
 
     def build(self) -> None:
         """Create the header, the status line, and the four tabs."""

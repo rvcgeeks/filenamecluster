@@ -422,7 +422,7 @@ The tab is `AppView._build_options_tab`. The pattern block and the three columns
 | --- | --- | --- |
 | Update preview | bottom button bar | `AppController.refresh` → `read_params` and `read_patterns` → `core.pipeline.cluster_directory` |
 | Restore defaults | bottom button bar | `AppController.restore_defaults` → `_reset_option_widgets` → `refresh`. Logging stays as it is |
-| Write application log | `logging_switch` checkbox, `logging_var`, on at startup | `AppController._logging_toggled` → `filenamecluster.log.set_logging_enabled`. This is not written into the model file |
+| Write application log | `logging_switch` checkbox, `logging_var`, off at startup | `AppController._logging_toggled` → `filenamecluster.log.set_logging_enabled`. This is not written into the model file |
 | Horizontal sash above the three columns | `options_rows` | Tk resize. `AppView._reflow` and `_flowing_help` wrap the hint text |
 | Filename patterns caption and help | pattern `LabelFrame` | Help text only |
 | Description and Pattern columns | `pattern_tree` | Double-click: `AppView._edit_pattern_cell` → `_begin_pattern_edit` |
@@ -519,6 +519,6 @@ Choosing a folder calls `_preview_saved_folder` on the background thread. That l
 | Double-clicking an event says the folder has not been created | Apply has not created that folder yet. The preview only draws | Apply clustering, then double-click again | `AppController.open_cluster_folder` |
 | Double-clicking a file says it cannot be opened | The loose path and the event-folder path are both missing | The file was removed after the preview. Update preview | `AppController.open_day_file`, `ui.controller.files.openable_file` |
 | Double-click opens the wrong application, or no window | The operating system chooses the application | Change the system association for that file type. The app calls `open`, `os.startfile`, or `xdg-open` | `ui.controller.files.open_file`, `open_folder_window` |
-| The log file has no new lines | Write application log is off, or the log directory could not be created. A failed log never stops the preview | Turn the switch back on. It starts on, and it is not stored in the model file. The About tab shows this computer’s full path | `AppController._logging_toggled`, `filenamecluster.log.configure`, `log_path` |
+| The log file has no new lines | Write application log is off, or the log directory could not be created. A failed log never stops the preview | Turn the switch on. It starts off, and it is not stored in the model file. The About tab shows this computer’s full path | `AppController._logging_toggled`, `filenamecluster.log.configure`, `log_path` |
 | The window text is in the wrong language | The menu selects a catalog. Unknown codes stay on English | Pick the language again. Catalogs must share keys with English or the app refuses to start | `AppController._language_changed`, `ui.model.i18n` |
 | Type looks soft on a high-resolution display | Tk scaling did not match the display | `main` calls `prepare_process_dpi` before creating Tk, and `theme.apply` calls `sharpen` | `ui.view.theme` |
