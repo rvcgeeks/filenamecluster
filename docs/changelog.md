@@ -11,7 +11,7 @@ This file records user-visible changes to File Name Cluster. Versions follow sem
 - Windows, macOS, and Linux programs are now compiled with Nuitka. The downloads stay the same: one Windows file, one Linux file, and a macOS app.
 - The package version is now `0.1.4`.
 - The build command is `uv run python -m build`, run in `filenamecluster/`. `build.py` is now the `build` package beside `src` and `tests`, with one module each for the command line, logging, the Nuitka command, the Windows Tcl library, the Mac app, and the project paths. Each module has its own test in `tests/build`.
-- The build writes a debug log to stderr, so a CI job keeps every step: the Python it used, each Tcl folder and archive it opened, each script it unpacked, and every line Nuitka prints. Nuitka itself runs with `--verbose` and its module, memory, plugin, progress, and C-compile traces.
+- The build writes a debug log to stderr, so a CI job keeps every step: the Python it used, each Tcl folder and archive it opened, and each script it unpacked. Nuitka writes its own output, the same command as the first build, without `--verbose` or the module, memory, plugin, progress, and C-compile traces.
 
 ### Fixed
 

@@ -13,17 +13,6 @@ from build.paths import ASSETS, PACKAGE, ROOT
 
 log = get_logger(__name__)
 
-# One ``--verbose`` is Nuitka's full trace. The ``--show-*`` flags add the
-# C compile commands, memory, included modules, plugin decisions, and progress.
-VERBOSE = (
-    "--verbose",
-    "--show-scons",
-    "--show-memory",
-    "--show-modules",
-    "--show-plugin-usage",
-    "--show-progress",
-)
-
 
 @dataclass(frozen=True)
 class NuitkaBuild:
@@ -46,7 +35,6 @@ class NuitkaBuild:
             "nuitka",
             "--standalone",
             "--assume-yes-for-downloads",
-            *VERBOSE,
             "--enable-plugins=tk-inter",
             "--output-dir=dist",
             f"--include-data-dir={ASSETS}=filenamecluster/ui/assets",
@@ -75,25 +63,11 @@ class NuitkaBuild:
     def run(self, extra: Sequence[str] = ()) -> int:
         """Run Nuitka beside ``pyproject.toml`` and return its exit code.
 
-        Nuitka's own trace is logged a line at a time, so a CI log keeps it
-        with the rest of the build.
+        Nuitka writes its own output, the same way the first build did.
         """
 
         command = self.command(extra)
-        log.debug("cwd %s", ROOT)
         log.debug("command %s", shlex.join(command))
-        process = subprocess.Popen(
-            command,
-            cwd=ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        assert process.stdout is not None
-        for line in process.stdout:
-            log.debug("%s", line.rstrip("\r\n"))
-        code = process.wait()
-        log.debug("exit %s", code)
-        return code
+        completed = subprocess.run(command, cwd=ROOT, check=False)
+        log.debug("exit %s", completed.returncode)
+        return completed.returncode

@@ -1,11 +1,10 @@
 """NuitkaBuild: one command per operating system."""
 
-import io
 import unittest
 from unittest.mock import MagicMock, patch
 
 from build import nuitka
-from build.nuitka import VERBOSE, NuitkaBuild
+from build.nuitka import NuitkaBuild
 from build.paths import ASSETS, PACKAGE, ROOT
 
 
@@ -19,9 +18,17 @@ class NuitkaCommandTests(unittest.TestCase):
             "--output-dir=dist",
             f"--include-data-dir={ASSETS}=filenamecluster/ui/assets",
             "--remove-output",
-            *VERBOSE,
         ):
             self.assertIn(option, command)
+        for option in (
+            "--verbose",
+            "--show-scons",
+            "--show-memory",
+            "--show-modules",
+            "--show-plugin-usage",
+            "--show-progress",
+        ):
+            self.assertNotIn(option, command)
         self.assertEqual(command[-2:], ["--python-flag=-m", str(PACKAGE)])
 
     def test_linux_and_windows_write_one_file(self):
@@ -48,26 +55,16 @@ class NuitkaCommandTests(unittest.TestCase):
         command = NuitkaBuild("win32").command(["--tcl-library-dir=x"])
         self.assertLess(command.index("--tcl-library-dir=x"), command.index("--python-flag=-m"))
 
-    def test_run_logs_every_nuitka_line_and_returns_the_code(self):
-        process = MagicMock()
-        process.stdout = io.StringIO("Nuitka: compiling\n")
-        process.wait.return_value = 4
+    def test_run_lets_nuitka_write_its_own_output_and_returns_the_code(self):
+        completed = MagicMock()
+        completed.returncode = 4
         build = NuitkaBuild("linux", python="py")
         with (
-            patch.object(nuitka.subprocess, "Popen", return_value=process) as popen,
+            patch.object(nuitka.subprocess, "run", return_value=completed) as run,
             self.assertLogs("build", level="DEBUG") as logs,
         ):
             self.assertEqual(build.run(["--x"]), 4)
-        popen.assert_called_once_with(
-            build.command(["--x"]),
-            cwd=ROOT,
-            stdout=nuitka.subprocess.PIPE,
-            stderr=nuitka.subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
+        run.assert_called_once_with(build.command(["--x"]), cwd=ROOT, check=False)
         text = "\n".join(logs.output)
-        self.assertIn("--verbose", text)
-        self.assertIn("Nuitka: compiling", text)
         self.assertIn("exit 4", text)
+        self.assertNotIn("--verbose", text)
