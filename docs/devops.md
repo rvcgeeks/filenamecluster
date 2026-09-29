@@ -92,8 +92,8 @@ Each build does this:
 3. Installs [uv](https://docs.astral.sh/uv/) and the locked dependencies from `filenamecluster/uv.lock`.
 4. On Linux, installs the small libraries Tk needs to open a window.
 5. Checks that Python can `import tkinter`.
-6. Runs `uv run python build.py`. That uses Nuitka, which compiles for the host system, so each job builds only for the computer it is on. The compiled program includes the files under `ui/assets`.
-   - Windows: one file, `dist/filenamecluster.exe`
+6. Runs `uv run python -m build` in `filenamecluster/`. That uses Nuitka, which compiles for the host system, so each job builds only for the computer it is on. The compiled program includes the files under `ui/assets`.
+   - Windows: one file, `dist/filenamecluster.exe`. It carries the Tcl and Tk library its window opens with, unpacked from the Python install, plus the registry and DDE packages. A Windows Python without that library stops the build.
    - Linux: one file, `dist/filenamecluster`
    - Mac: `dist/filenamecluster.app`. The app is a folder, which is what macOS expects.
 7. Renames that program with the version. On a Mac it also wraps the app in a disk image, because the Release needs a single file.

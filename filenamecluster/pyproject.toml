@@ -50,13 +50,16 @@ python-preference = "only-managed"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["tests"]
+pythonpath = ["tests", "."]
+# pytest skips folders named build by default, and tests/build holds the build tests.
+norecursedirs = [".*", "*.egg", "__pycache__", "dist", "reports", "venv"]
 # pytest captures INFO from non-propagating loggers and pytest-html embeds it.
 # A full camera-roll trace makes reports/pytest.html hundreds of megabytes.
 log_level = "WARNING"
 addopts = [
     "--import-mode=importlib",
     "--cov=filenamecluster",
+    "--cov=build",
     "--cov-report=term-missing",
     "--cov-report=html:reports/coverage",
     "--cov-fail-under=80",
@@ -65,5 +68,5 @@ addopts = [
 ]
 
 [tool.coverage.run]
-source = ["filenamecluster"]
+source = ["filenamecluster", "build"]
 branch = false

@@ -139,7 +139,7 @@ source = { editable = "../filenamecluster" }
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "imageio", marker = "sys_platform == 'darwin'", specifier = ">=2.37" },
+    { name = "imageio", specifier = ">=2.37" },
     { name = "nuitka", specifier = ">=2.7" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-cov", specifier = ">=6.0" },
