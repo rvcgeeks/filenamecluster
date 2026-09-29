@@ -16,7 +16,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Iterator, Sequence
 
-from filenamecluster.core.organize import NamedCluster
 
 SECONDS_PER_DAY = 86_400
 MARGIN = 48
@@ -89,7 +88,7 @@ def fit_pixels_per_day(start: datetime, end: datetime, width: float) -> float:
     return clamp_pixels_per_day(usable / span_days(start, end), start, end)
 
 
-def layout_bars(clusters: Sequence[NamedCluster], scale: TimeScale) -> list[Bar]:
+def layout_bars(clusters: Sequence, scale: TimeScale) -> list[Bar]:
     """Give each cluster an x range and the first lane where it does not overlap.
 
     The number label drawn at the left of each bar counts as part of its
@@ -116,7 +115,7 @@ def layout_bars(clusters: Sequence[NamedCluster], scale: TimeScale) -> list[Bar]
     return bars
 
 
-def file_marks(clusters: Sequence[NamedCluster], scale: TimeScale) -> list[int]:
+def file_marks(clusters: Sequence, scale: TimeScale) -> list[int]:
     """Distinct pixel columns inside the scale that hold at least one file."""
 
     return sorted(

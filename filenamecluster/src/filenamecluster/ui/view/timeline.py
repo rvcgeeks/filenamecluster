@@ -13,27 +13,14 @@ from datetime import datetime
 from tkinter import ttk
 from typing import Callable, Sequence
 
-from filenamecluster.core.organize import NamedCluster
-from filenamecluster.ui.view import theme
-from filenamecluster.ui.model.i18n import t
-from filenamecluster.ui.view.layout import (
-    Bar,
-    TimeScale,
-    axis_ticks,
-    file_marks,
-    fit_pixels_per_day,
-    layout_bars,
-)
+from . import theme
+from .layout import Bar, TimeScale, fit_pixels_per_day
+from .timeline_draw import TimelinePainter, describe_zoom
 
-AXIS_Y = 26
-LANE_TOP = 38
-LANE_HEIGHT = 26
-BAR_HEIGHT = 18
-MARK_HEIGHT = 14
 ZOOM_STEP = 1.5
 
 
-class TimelineView(ttk.Frame):
+class TimelineView(TimelinePainter, ttk.Frame):
     """Clusters as bars on a time axis, one file per tick underneath.
 
     Mouse wheel scrolls sideways; Ctrl or Cmd with the wheel zooms around the
@@ -51,10 +38,11 @@ class TimelineView(ttk.Frame):
         on_select: Callable[[int], None] | None = None,
         on_time: Callable[[datetime], None] | None = None,
         on_open: Callable[[int], None] | None = None,
+        translate: Callable[..., str],
         fonts: dict | None = None,
     ) -> None:
         super().__init__(master)
-        self.clusters: tuple[NamedCluster, ...] = ()
+        self.clusters: tuple = ()
         self.range: tuple[datetime, datetime] | None = None
         self.scale: TimeScale | None = None
         self.bars: list[Bar] = []
@@ -64,13 +52,18 @@ class TimelineView(ttk.Frame):
         self._on_select = on_select
         self._on_time = on_time
         self._on_open = on_open
+        self._translate = translate
         self._small = (fonts or {}).get("small")
 
         tools = ttk.Frame(self)
         tools.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
         ttk.Button(tools, text="−", width=3, command=self.zoom_out).pack(side="left")
         ttk.Button(tools, text="+", width=3, command=self.zoom_in).pack(side="left", padx=4)
-        self.fit_button = ttk.Button(tools, text=t("fit"), command=self.fit)
+        self.fit_button = ttk.Button(
+            tools,
+            text=self._translate("fit"),
+            command=self.fit,
+        )
         self.fit_button.pack(side="left")
         self.scale_label = ttk.Label(tools, style="Muted.TLabel")
         self.scale_label.pack(side="right")
@@ -106,7 +99,7 @@ class TimelineView(ttk.Frame):
 
     def show(
         self,
-        clusters: Sequence[NamedCluster],
+        clusters: Sequence,
         start: datetime | None = None,
         end: datetime | None = None,
     ) -> None:
@@ -151,9 +144,11 @@ class TimelineView(ttk.Frame):
             self._draw_placeholder()
 
     def retranslate(self) -> None:
-        self.fit_button.configure(text=t("fit"))
+        self.fit_button.configure(text=self._translate("fit"))
         if self.scale is not None:
-            self.scale_label.configure(text=_describe_zoom(self.scale.pixels_per_day))
+            self.scale_label.configure(
+                text=describe_zoom(self.scale.pixels_per_day, self._translate)
+            )
 
     def fit(self) -> None:
         if self.range is None:
@@ -177,95 +172,6 @@ class TimelineView(ttk.Frame):
     def _visible_width(self) -> float:
         width = self.canvas.winfo_width()
         return width if width > 1 else 900
-
-    def _draw_placeholder(self) -> None:
-        self.canvas.delete("all")
-        self.scale_label.configure(text="")
-        self.canvas.configure(scrollregion=(0, 0, 1, 1))
-        self.canvas.create_text(
-            theme.px(16),
-            theme.px(24),
-            anchor="w",
-            text=self._placeholder,
-            fill=theme.MUTED,
-            font=self._small,
-        )
-
-    def _draw(self, pixels_per_day: float) -> None:
-        assert self.range is not None
-        scale = TimeScale(*self.range, pixels_per_day)
-        self.scale = scale
-        self.bars = layout_bars(self.clusters, scale)
-        canvas = self.canvas
-        canvas.delete("all")
-
-        axis_y = theme.px(AXIS_Y)
-        lane_top = theme.px(LANE_TOP)
-        lane_height = theme.px(LANE_HEIGHT)
-        bar_height = theme.px(BAR_HEIGHT)
-        mark_height = theme.px(MARK_HEIGHT)
-        lanes = max((bar.lane for bar in self.bars), default=0) + 1
-        marks_top = lane_top + lanes * lane_height + theme.px(4)
-        height = marks_top + mark_height + theme.px(8)
-        width = scale.width
-
-        ticks = axis_ticks(scale)
-        for tick in ticks:
-            if not tick.major:
-                canvas.create_line(tick.x, axis_y, tick.x, height, fill=theme.GRID_MINOR)
-        for tick in ticks:
-            if tick.major:
-                canvas.create_line(tick.x, axis_y - theme.px(6), tick.x, height, fill=theme.GRID_MAJOR)
-                canvas.create_text(
-                    tick.x + theme.px(3),
-                    axis_y - theme.px(4),
-                    anchor="sw",
-                    text=tick.label,
-                    fill=theme.MUTED,
-                    font=self._small,
-                )
-        canvas.create_line(0, axis_y, width, axis_y, fill=theme.BORDER)
-
-        for bar in self.bars:
-            cluster = self.clusters[bar.index]
-            top = lane_top + bar.lane * lane_height
-            tags = ("bar", f"c{bar.index}")
-            canvas.create_rectangle(
-                bar.x0,
-                top,
-                bar.x1,
-                top + bar_height,
-                fill=theme.BAR_FILLS[cluster.number % 2],
-                outline=theme.BAR_OUTLINE,
-                tags=(*tags, "rect"),
-            )
-            canvas.create_text(
-                bar.x0 + theme.px(3),
-                top + bar_height / 2,
-                anchor="w",
-                text=str(cluster.number),
-                fill=theme.TEXT,
-                font=self._small,
-                tags=tags,
-            )
-
-        for x in file_marks(self.clusters, scale):
-            canvas.create_line(x, marks_top, x, marks_top + mark_height, fill=theme.FILE_MARK)
-
-        canvas.configure(scrollregion=(0, 0, width, height))
-        self.scale_label.configure(text=_describe_zoom(scale.pixels_per_day))
-        self._paint_selection()
-
-    def _paint_selection(self) -> None:
-        for bar in self.bars:
-            number = self.clusters[bar.index].number
-            chosen = bar.index == self.selected
-            self.canvas.itemconfigure(
-                f"c{bar.index}&&rect",
-                fill=theme.SELECTED_FILL if chosen else theme.BAR_FILLS[number % 2],
-                outline=theme.SELECTED_OUTLINE if chosen else theme.BAR_OUTLINE,
-                width=2 if chosen else 1,
-            )
 
     def _bar_index(self) -> int | None:
         tags = self.canvas.gettags("current")
@@ -308,12 +214,5 @@ class TimelineView(ttk.Frame):
         self.zoom(ZOOM_STEP if event.delta > 0 else 1 / ZOOM_STEP, anchor=event.x)
         return "break"
 
-
-def _describe_zoom(pixels_per_day: float) -> str:
-    if pixels_per_day >= 24:
-        return t("zoom_hour", n=f"{pixels_per_day / 24:.0f}")
-    if pixels_per_day >= 1:
-        return t("zoom_day", n=f"{pixels_per_day:.0f}")
-    return t("zoom_month", n=f"{pixels_per_day * 30:.0f}")
 
 trace_module(sys.modules[__name__])

@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from filenamecluster import log as logmod
-from filenamecluster.core.learn import model_path
+from filenamecluster.core.operations import model_path
 
 
 class LogTests(unittest.TestCase):

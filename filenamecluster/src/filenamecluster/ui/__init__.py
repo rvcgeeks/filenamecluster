@@ -3,7 +3,7 @@
 Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 Introduction: ``readme.md``. Mathematics: ``docs/algorithm.md``.
 Design: ``docs/architecture.md``. The window icon is ``ui/assets/icon.svg``.
-Visible strings are JSON catalogs in ``ui/model/i18n`` for English, Hindi, Marathi, German, French, Japanese, and Korean. The window is ``app.py``. Drawing, theme, and layout live in ``view``. Session state lives in ``model``. Actions live in ``controller``.
+Visible strings are JSON catalogs in ``ui/assets/i18n``, loaded by ``ui/view/i18n``, for English, Hindi, Marathi, German, French, Japanese, and Korean. The window is ``app.py``. Drawing, theme, and layout live in ``view``. Session state lives in ``model``. Actions live in ``controller``.
 """
 
 import sys

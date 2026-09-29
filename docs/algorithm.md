@@ -23,7 +23,7 @@ Line numbers below are the current source under `filenamecluster/src/filenameclu
 
 ## The algorithm in pseudocode
 
-The six steps above, in the order the code runs them. Names match `cluster_files`, `fit_gap_model`, and `GapModel.splits`. Later sections derive each line.
+The six steps above, in the order the code runs them. Names match `cluster`, `fit`, and `GapModel.splits`. Later sections derive each line.
 
 ```text
 cluster(files, F = 3 h, C = 720 h, saved):
@@ -48,7 +48,7 @@ fit(U):
     μ_w, σ_w² ← mean and variance of L, variance ≥ 0.05
     μ_b, σ_b² ← mean and variance of H, variance ≥ 0.05
     π_w ← 1/2
-    repeat EM_ROUNDS times:                # learn.EM_ROUNDS, set to 25
+    repeat EM_ROUNDS times:                # algorithm/fit.py EM_ROUNDS, set to 25
         for each x in U:
             r_w(x) ← short-pattern share       # Bayes, in log space
             r_b(x) ← 1 − r_w(x)
@@ -227,7 +227,7 @@ g_i = \frac{t_{i+1} - t_i}{3600}, \qquad i = 1,\ldots,N-1.
 >
 > Example: photos at 10:00, 10:30, and 16:30 give waits of 0.5 hours and 6 hours.
 
-Code: sort in `cluster.py` line 81; $g_i$ in `cluster.py` lines 87–90.
+Code: sort in `core/algorithm/cluster.py` line 84; $g_i$ in `core/algorithm/cluster.py` lines 98–101.
 
 Two safety limits are fixed before the fit. By default the floor is $F = 3$ hours and the ceiling is $C = 720$ hours (30 days), with $0 < F < C$.
 
@@ -238,7 +238,7 @@ Two safety limits are fixed before the fit. By default the floor is $F = 3$ hour
 >
 > The floor must be bigger than zero, and the ceiling must be bigger than the floor. Otherwise the rails would make no sense.
 
-Code: defaults in `cluster.py` lines 34–35; the check $0 < F < C$ in lines 37–41; conversion to hours in lines 43–49.
+Code: defaults in `core/algorithm/cluster.py` lines 37–38; the check $0 < F < C$ in lines 40–44; conversion to hours in lines 47–52.
 
 The fit does not see bursts of a few seconds, and it does not see pauses already long enough to be a hard boundary. The training sample is
 
@@ -263,7 +263,7 @@ The fit does not see bursts of a few seconds, and it does not see pauses already
 >
 > Now “3 hours versus 10 hours” and “100 hours versus 330 hours” look like the same size of step, which is how people actually feel about waiting.
 
-Code: `cluster.py` lines 91–95. That list is passed to `fit_gap_model` at line 96.
+Code: `core/algorithm/cluster.py` lines 102–106. That list is passed to `fit` at line 149.
 
 #### Derivation: what a Gaussian on $\ln g$ means for $g$
 
@@ -323,7 +323,7 @@ p(x) = \pi_w\,\mathcal{N}(x;\mu_w,\sigma_w^2) + \pi_b\,\mathcal{N}(x;\mu_b,\sigm
 >
 > For example, if $\pi_w = 0.7$, then 7 out of 10 middle-sized waits look like “still at the same outing”, and 3 out of 10 look like “moved on to a new outing”.
 
-Code: $\pi_b = 1-\pi_w$ in `learn.py` lines 115 and 146–147. The mixture is not a separate function; it is the denominator of the responsibility in `learn.py` lines 136–150.
+Code: $\pi_b = 1-\pi_w$ in `core/algorithm/fit.py` lines 130 and 169–170. The mixture is not a separate function; it is the denominator of the responsibility in `core/algorithm/fit.py` lines 160–174.
 
 $\mu_w$ is the short pattern (a pause inside an event). $\mu_b$ is the long pattern (a pause between events). The component density is
 
@@ -358,7 +358,7 @@ Its log is
 
 > **In simple words.** Computers get confused by numbers that are extremely tiny, like 0.000000000000001. Taking the log turns those into ordinary negative numbers, like −34, which the computer handles easily. Bigger log still means “more likely”, so comparisons still work.
 
-Code: the log density is `_log_density` in `learn.py` lines 153–154. The exponential form of $\mathcal{N}$ is not written out; every comparison uses this log.
+Code: the log density is `_log_density` in `core/algorithm/fit.py` lines 177–178. The exponential form of $\mathcal{N}$ is not written out; every comparison uses this log.
 
 #### Derivation: the log density
 
@@ -376,7 +376,7 @@ If $|\mathcal{U}| < 4$, the mixture is not fitted.
 
 > **In simple words.** $|\mathcal{U}|$ means “how many waits are in the learning pile”. With fewer than 4 examples you cannot honestly see two hills, just like you cannot tell the shape of a mountain range from 3 pebbles. So the app does not guess. It reuses what it learned before for this folder, or uses a simple backup rule (see section 7 and section 8).
 
-Code: `learn.py` returns `None` when there are fewer than four gaps. The caller then either reuses a saved boundary or falls back, in `cluster.py` lines 96–107.
+Code: `core/algorithm/fit.py` returns `None` when there are fewer than four gaps (lines 58–60). The caller then either reuses a saved boundary or falls back, in `core/algorithm/cluster.py` lines 114–127.
 
 ## 3. Initialisation
 
@@ -412,7 +412,7 @@ and the same for $\sigma_b^{2\,(0)}$ on $H$. The variance floor $0.05$ stops a r
 >
 > Finally, we start by saying each hill owns half the waits: $\pi_w = 1/2$. It is a fair, neutral start.
 
-Code: the half split is `learn.py` lines 58–60; the two means lines 61–62; both variances lines 63–64; $\pi_w^{(0)} = 1/2$ at line 65. `_mean` is lines 191–192 and `_variance` is lines 195–198. The floor constant is line 17.
+Code: the half split is `core/algorithm/fit.py` lines 64–65; the two means lines 66–67; both variances lines 68–69; $\pi_w^{(0)} = 1/2$ at line 70. `_mean` is lines 215–216 and `_variance` is lines 219–222. The floor constant is line 18.
 
 #### Why these starting values
 
@@ -449,7 +449,7 @@ r_w(x)
 {\pi_w\,\mathcal{N}(x;\mu_w,\sigma_w^2)+\pi_b\,\mathcal{N}(x;\mu_b,\sigma_b^2)}.
 ```
 
-> **In simple words.** `EM_ROUNDS` is how many times we play the two-step game. It is set to 25 in `learn.py`.
+> **In simple words.** `EM_ROUNDS` is how many times we play the two-step game. It is set to 25 in `core/algorithm/fit.py`.
 >
 > $r_w(x)$ is the **responsibility**: a number between 0 and 1 that says how much the short hill “owns” this wait.
 >
@@ -473,7 +473,7 @@ and the symmetric form when $\ell_b$ is larger. Then $r_b(x) = 1-r_w(x)$.
 >
 > Whatever share the short hill does not take, the long hill takes: $r_b = 1 - r_w$.
 
-Code: `_responsibility` in `learn.py` lines 136–150. $\ell_w$ and $\ell_b$ are lines 144–147. The two branches of $r_w$ are lines 148–150. $r_b = 1-r_w$ is line 78.
+Code: `_responsibility` in `core/algorithm/fit.py` lines 160–174. $\ell_w$ and $\ell_b$ are lines 168–170. The two branches of $r_w$ are lines 172–174. $r_b = 1-r_w$ is line 83.
 
 #### Derivation: responsibility is Bayes’ rule
 
@@ -528,7 +528,7 @@ and likewise for the long component with $r_b$. If either total responsibility f
 > - If one hill ends up owning almost nothing (less than one millionth, which is $10^{-6}$), there is nothing left to learn about it, so we stop early.
 > - The names must not get mixed up. The “short” hill must always be the one on the left (smaller waits). If they ever cross over, we swap their labels back.
 
-Code: the loop of `EM_ROUNDS` iterations is `learn.py`. Responsibilities for unlabeled and pinned points are lines 68–82. The stop at $10^{-6}$ is lines 84–88. The weighted means are lines 89–90, the weighted variances lines 91–100, and the weight line 101. The swap is lines 102–105.
+Code: the loop of `EM_ROUNDS` iterations is `core/algorithm/fit.py` lines 72–120. Responsibilities for unlabeled and pinned points are lines 73–87. The stop at $10^{-6}$ is lines 92–94. The weighted means are lines 95–96, the weighted variances lines 97–106, and the weight line 107. The swap is lines 108–112.
 
 #### Derivation: the M-step updates
 
@@ -599,7 +599,7 @@ A difference of $1$ on the log-hour scale is a factor of $e$ in hours. A weight 
 >
 > If both tests pass, we say the patterns **separated**.
 
-Code: `learn.py` line 107. The constant $1$ is `_SEPARATION` at line 18.
+Code: `core/algorithm/fit.py` line 122. The constant $1$ is `_SEPARATION` at line 19.
 
 #### Where the “factor of $e$” comes from
 
@@ -663,7 +663,7 @@ The root used is the one inside $(\mu_w,\mu_b)$. If none is inside, $\tau = (\mu
 > - Otherwise we use the school formula. The $\pm$ gives two possible answers. We keep the one that sits in the valley between the two middles.
 > - If, for some odd reason, neither answer is in the valley, we just take the point exactly halfway between the two middles. That is always a sensible fallback.
 
-Code: `_boundary` in `learn.py` lines 157–188. The coefficients $a$, $b$, $c$ are lines 167–174. The linear case $|a| < 10^{-9}$ is lines 175–177. The quadratic roots are lines 178–184. The root inside $(\mu_w,\mu_b)$, or the midpoint, is lines 185–188. The call site is lines 108–116.
+Code: `_boundary` in `core/algorithm/fit.py` lines 181–212. The coefficients $a$, $b$, $c$ are lines 191–198. The linear case $|a| < 10^{-9}$ is lines 199–201. The quadratic roots are lines 202–208. The root inside $(\mu_w,\mu_b)$, or the midpoint, is lines 209–212. The call site is lines 123–131.
 
 #### Derivation: from “equally likely” to $a\tau^2 + b\tau + c = 0$
 
@@ -742,7 +742,7 @@ A single rhythm whose typical pause is already 18 hours or more is treated as a 
 >
 > **Case B: your typical wait is shorter than 18 hours.** For example, a long holiday where you take a photo every few hours. All those waits belong to the same trip. So we put the boundary far **after** the middle ($\bar x + 2s$). Only an unusually long wait, well beyond the normal rhythm, starts a new event.
 
-Code: `learn.py` lines 117–127. $\bar x$ is line 119, $s$ is line 120, $\ln 18$ is line 124, and the two branches of $\tau$ are lines 125–127.
+Code: `core/algorithm/fit.py` lines 132–142. $\bar x$ is line 134, $s$ is line 135, $\ln 18$ is line 139, and the two branches of $\tau$ are lines 140–142.
 
 #### What this rule implies
 
@@ -770,7 +770,7 @@ The reported hours are $e^{\mu_w}$, $e^{\mu_b}$, and $e^{\tau}$.
 >
 > For the real camera roll this app was built on, those came out at about 17.6 hours, 81.1 hours, and 38.0 hours. So for that person, a wait of more than about a day and a half means “new event”.
 
-Code: `learn.py` lines 128–132.
+Code: `core/algorithm/fit.py` lines 143–148.
 
 For every $g_i$, including those held out of $\mathcal{U}$,
 
@@ -793,7 +793,7 @@ A new event starts at file $i+1$ exactly when $\mathrm{split}(g_i)$ is true. Equ
 >
 > “Split” means “start a new pile here”. Two photos with the exact same clock have a wait of 0, and 0 is less than the floor, so they always stay together.
 
-Code: `GapModel.splits` in `learn.py`. The walk that starts a new group is `cluster.py` lines 102–113. A zero gap fails `hours <= floor_hours` in `GapModel.splits`, so it does not split.
+Code: `split` in `core/algorithm/split.py` lines 31–37. `GapModel.splits` calls it. The walk that starts a new group is `core/algorithm/cluster.py` lines 137–165. A zero gap fails `hours <= floor_hours` in `split`, so it does not split.
 
 #### Why the comparison is done in hours
 
@@ -830,7 +830,7 @@ When $|\mathcal{U}| < 4$ and this folder has no saved boundary, there is no $\ta
 
 > **In simple words.** If there were too few middle-sized waits to learn from, and we never learned anything for this folder before, we use a simple backup rule: “a wait of 36 hours (a day and a half) or more starts a new event”. The symbol $\lor$ means “or”. This keeps a day of photos and the next morning together, but splits a gap of two days.
 
-Code: `cluster.py` lines 104–107. The flowchart above is that branch together with `GapModel.splits`.
+Code: `core/algorithm/split.py` lines 31–32. The flowchart above is that branch together with the floor, ceiling, and boundary checks in the same function.
 
 ## 8. What is kept, and what the next batch does
 
@@ -845,17 +845,17 @@ The fitted triple $(e^{\mu_w}, e^{\mu_b}, e^{\tau})$ and the flag $\mu_b-\mu_w \
 >
 > The numbers are saved with every digit the computer has, like `37.98317023002044`, not chopped to `37.98`. A model is only as good as its numbers, so nothing is thrown away. Beside that learned note, the same file stores the options used for the folder: the safety limits, the year window, the priorities, and the filename patterns. Those options are loaded over the built-in defaults the next time the folder is chosen. They do not change how the boundary is fitted or reused.
 
-Code: the four learned fields are `GapModel` in `learn.py`. The write, with no rounding, is `_learned_document` in the same module, called from `save_model`. The same write stores `options` through `_options_document`. The Options tab shows the four learned fields, `learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, and `learned.separated`, in a read-only table. The numbers are formatted with `json.dumps`, so they match the file. When no boundary was fitted, each value is `null`. A missing or unusable `options` object leaves the defaults in place and keeps a valid `learned` object.
+Code: the four learned fields are `GapModel` in `core/algorithm/fit.py`. The write, with no rounding, is `_learned_document` in `core/operations/model.py`, called from `save_model`. The same write stores `options` through `_options_document`. The Options tab shows the four learned fields, `learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, and `learned.separated`, in a read-only table. The numbers are formatted with `json.dumps`, so they match the file. When no boundary was fitted, each value is `null`. A missing or unusable `options` object leaves the defaults in place and keeps a valid `learned` object.
 
 On a later scan the sequence is rebuilt from every timestamped file in the chosen folder and inside existing event folders, sorted again as one series. $\mathcal{U}$ is recomputed from that series.
 
 > **In simple words.** Later, you copy some new photos into the same folder and look again. The app does not forget the old photos. It collects **all** of them: the new loose photos, and the photos already sitting inside event folders from last time. It lines them all up again, from the beginning, as one long line, and measures every wait again.
 
-Code: loose files and files already inside event folders are collected in `pipeline.py` lines 81–96, then sorted inside `cluster_files` (`cluster.py` line 81). $\mathcal{U}$ is rebuilt at `cluster.py` lines 91–95.
+Code: loose files and files already inside event folders are collected in `core/operations/pipeline.py` lines 97–118, then sorted inside `cluster` (`core/algorithm/cluster.py` line 84). $\mathcal{U}$ is rebuilt at `core/algorithm/cluster.py` lines 102–106.
 
-- If $|\mathcal{U}| \ge 4$, $\tau$ is fitted again from the whole series. The previous numbers are replaced. Code: `cluster.py` line 96, then `pipeline.py` lines 99–104.
-- If $|\mathcal{U}| < 4$ and a boundary was saved, that saved $\tau$ is used in the decision rule above. Code: `cluster.py` lines 97–100, loaded earlier by `pipeline.py` line 76.
-- If $|\mathcal{U}| < 4$ and nothing was saved, the 36-hour fallback is used. Code: `cluster.py` lines 104–107.
+- If $|\mathcal{U}| \ge 4$, $\tau$ is fitted again from the whole series. The previous numbers are replaced. Code: `core/algorithm/cluster.py` line 149, then `core/operations/pipeline.py` lines 121–126.
+- If $|\mathcal{U}| < 4$ and a boundary was saved, that saved $\tau$ is used in the decision rule above. Code: `core/algorithm/cluster.py` lines 150–153, loaded earlier by `core/operations/pipeline.py` line 76.
+- If $|\mathcal{U}| < 4$ and nothing was saved, the 36-hour fallback is used. Code: `core/algorithm/split.py` lines 31–32, called from `core/algorithm/cluster.py` lines 141–142.
 
 > **In simple words.** Then one of three things happens:
 >
@@ -865,7 +865,7 @@ Code: loose files and files already inside event folders are collected in `pipel
 >
 > Because of this, a new photo taken during an old trip can **join** that trip’s pile, and a new photo from a new day out can **start** a new pile.
 
-The saved boundary is a parameter of the decision rule. It is not a prior inside the EM update. `fit_gap_model` at `cluster.py` line 96 receives only the new unlabeled log gaps. The saved model is assigned only when that fit returns `None`, at lines 97–100. The options saved beside it are not passed into `fit_gap_model`.
+The saved boundary is a parameter of the decision rule. It is not a prior inside the EM update. `fit` at `core/algorithm/cluster.py` line 149 receives only the new unlabeled log gaps. The saved model is assigned only when that fit returns `None`, at lines 150–153. The options saved beside it are not passed into `fit`.
 
 > **In simple words.** The old note is only a **backup answer**. It does not push or bend the new learning. When there are enough waits, the app learns fresh from the photos, exactly as if it had never seen the note. The note is only picked up when the fresh learning says “I don’t have enough examples”.
 

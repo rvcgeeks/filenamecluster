@@ -3,14 +3,14 @@
 import unittest
 from datetime import datetime, timedelta
 
-from filenamecluster.core.cluster import Cluster
-from filenamecluster.core.organize import name_clusters
-from filenamecluster.core.parse import TimestampedFile
-from filenamecluster.ui.view.layout import (
-    MARGIN,
+from filenamecluster.core.algorithm.cluster import Cluster
+from filenamecluster.core.operations.organize import name_clusters
+from filenamecluster.core.parser import TimestampedFile
+from filenamecluster.ui.view import (
     MAX_WIDTH,
     MIN_BAR,
     MIN_PIXELS_PER_DAY,
+    MARGIN,
     TimeScale,
     axis_ticks,
     file_marks,

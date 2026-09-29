@@ -8,21 +8,21 @@ Design: ``docs/architecture.md``.
 import sys
 from filenamecluster.log import trace_module
 
-from filenamecluster.core.cluster import Cluster, ClusterParams, cluster_files
-from filenamecluster.core.organize import (
+from filenamecluster.core.algorithm.cluster import Cluster, ClusterParams, cluster
+from filenamecluster.core.operations.organize import (
     NamedCluster,
     cluster_name,
     flatten_cluster_folders,
     is_cluster_folder_name,
     move_into_cluster_folders,
 )
-from filenamecluster.core.parse import (
+from filenamecluster.core.parser import (
     TimestampPatterns,
     TimestampedFile,
     parse_timestamp,
     scan_directory,
 )
-from filenamecluster.core.pipeline import ClusterResult, cluster_directory
+from filenamecluster.core.operations.pipeline import ClusterResult, cluster_directory
 
 __all__ = [
     "Cluster",
@@ -32,7 +32,7 @@ __all__ = [
     "TimestampPatterns",
     "TimestampedFile",
     "cluster_directory",
-    "cluster_files",
+    "cluster",
     "cluster_name",
     "flatten_cluster_folders",
     "is_cluster_folder_name",

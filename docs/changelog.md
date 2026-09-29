@@ -4,6 +4,22 @@ Rajas Chavadekar (rvchavadekar@gmail.com)
 
 This file records user-visible changes to File Name Cluster. Versions follow semantic versioning.
 
+## 0.1.3
+
+### Changed
+
+- The window is now classic desktop MVC. One session holds the folder, options, preview, selection, language, and log switch. The view draws that session. The controller handles clicks and asks before files move. Clustering math, the 25-round fit, the 36-hour fallback, Apply, Flatten, the seven languages, and the log switch behave as in 0.1.2.
+- A folder scan, a preview, Apply, and Flatten still show the same dialogs and the same spinner sentences. After Apply, the preview stays until you choose another folder or flatten.
+- `filenamecluster-model.json` is still the only model file, and it is still written in one place. Saved options and the learned boundary are unchanged.
+- The package version is now `0.1.3`.
+
+### Fixed
+
+- Custom filename-pattern rules now carry their saved rule key explicitly during preview. Core no longer guesses a rule key from the pattern-table row name, so custom rules and their invalid markers cannot be confused with built-in rules.
+- Folder scans and file moves now keep successful results separate from exceptions. Read and move failures cannot be mistaken for successful operation values.
+- Option validation now reports the exact semantic field and fault to the window, while the window alone chooses the translated message. Number, whole-number, and range errors continue to show the correct option label.
+- Model option drafts and pattern rows are exposed as copies, preventing a view or controller from accidentally changing session state without its normal update notification.
+
 ## 0.1.2
 
 ### Added

@@ -107,11 +107,11 @@ def _enable_retina_app() -> None:
 
 
 def _bundled_files() -> list[tuple[Path, str]]:
-    """JSON catalogs and the window icon, placed beside their modules."""
+    """JSON catalogs, the window icon, and the spinner, placed with the UI assets."""
 
     files = [
-        (path, "filenamecluster/ui/model/i18n")
-        for path in sorted((PACKAGE / "ui" / "model" / "i18n").glob("*.json"))
+        (path, "filenamecluster/ui/assets/i18n")
+        for path in sorted((PACKAGE / "ui" / "assets" / "i18n").glob("*.json"))
     ]
     icon = PACKAGE / "ui" / "assets" / "icon.png"
     if icon.is_file():

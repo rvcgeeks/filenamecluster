@@ -5,7 +5,7 @@ import tkinter as tk
 import unittest
 from pathlib import Path
 
-from filenamecluster.ui.view.spinner import SpinnerDialog, gif_delays, gif_frames, spinner_path
+from filenamecluster.ui.view import SpinnerDialog, gif_delays, gif_frames, spinner_path
 
 
 def _advance_frame(dialog: SpinnerDialog) -> None:

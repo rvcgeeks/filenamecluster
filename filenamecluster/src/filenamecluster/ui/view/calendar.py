@@ -10,47 +10,16 @@ from filenamecluster.log import trace_module
 
 import calendar
 import tkinter as tk
-from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from tkinter import ttk
 from typing import Callable, Sequence
 
-from filenamecluster.core.organize import NamedCluster
-from filenamecluster.ui.view import theme
-from filenamecluster.ui.model.i18n import file_count, t
+from . import theme
 
 PHOTO_FILLS = ("#aed6f1", "#7fb9e6")
 SPAN_FILL = "#e3f0fa"
 OUTSIDE_FILL = "#f5f9fd"
 HEADER_HEIGHT = 24
-
-
-@dataclass(frozen=True, slots=True)
-class DayInfo:
-    """What happened on one calendar day."""
-
-    files: int
-    cluster: int | None
-
-
-def summarize_days(clusters: Sequence[NamedCluster]) -> dict[date, DayInfo]:
-    """Map each day inside an event to its file count and cluster index.
-
-    Days between an event's first and last photo are included with zero
-    files, so a multi-day occasion shows as one continuous block.
-    """
-
-    days: dict[date, DayInfo] = {}
-    for index, cluster in enumerate(clusters):
-        counts: dict[date, int] = {}
-        for item in cluster.files:
-            day = item.timestamp.date()
-            counts[day] = counts.get(day, 0) + 1
-        day = cluster.start.date()
-        while day <= cluster.end.date():
-            days[day] = DayInfo(files=counts.get(day, 0), cluster=index)
-            day += timedelta(days=1)
-    return days
 
 
 def month_weeks(year: int, month: int) -> list[list[date]]:
@@ -76,17 +45,19 @@ class CalendarView(ttk.Frame):
         *,
         on_day: Callable[[date], None] | None = None,
         on_open: Callable[[int], None] | None = None,
+        translate: Callable[..., str],
         fonts: dict | None = None,
     ) -> None:
         super().__init__(master)
-        self.clusters: tuple[NamedCluster, ...] = ()
-        self.days: dict[date, DayInfo] = {}
+        self.clusters: tuple = ()
+        self.days: dict[date, object] = {}
         today = date.today()
         self.year, self.month = today.year, today.month
         self.selected_day: date | None = None
         self.selected_cluster: int | None = None
         self._on_day = on_day
         self._on_open = on_open
+        self._translate = translate
         fonts = fonts or {}
         self._small = fonts.get("small")
         self._bold = fonts.get("bold")
@@ -121,9 +92,9 @@ class CalendarView(ttk.Frame):
         self.canvas.bind("<Double-Button-1>", self._double)
         self.redraw()
 
-    def set_clusters(self, clusters: Sequence[NamedCluster]) -> None:
+    def set_clusters(self, clusters: Sequence, days: dict[date, object]) -> None:
         self.clusters = tuple(clusters)
-        self.days = summarize_days(self.clusters)
+        self.days = dict(days)
         self.selected_cluster = None
         self.selected_day = None
         if self.clusters:
@@ -171,7 +142,9 @@ class CalendarView(ttk.Frame):
         canvas = self.canvas
         canvas.delete("all")
         self._cells = {}
-        self.title.configure(text=f"{t(f'month_{self.month}')} {self.year}")
+        self.title.configure(
+            text=f"{self._translate(f'month_{self.month}')} {self.year}"
+        )
         header = theme.px(HEADER_HEIGHT)
         width = max(canvas.winfo_width(), theme.px(420))
         height = max(canvas.winfo_height(), theme.px(300))
@@ -183,7 +156,7 @@ class CalendarView(ttk.Frame):
             canvas.create_text(
                 column * cell_w + cell_w / 2,
                 header / 2,
-                text=t(f"wd_short_{column}"),
+                text=self._translate(f"wd_short_{column}"),
                 fill=theme.MUTED,
                 font=self._small,
             )
@@ -245,7 +218,10 @@ class CalendarView(ttk.Frame):
                 x0 + theme.px(6),
                 y1 - theme.px(5),
                 anchor="sw",
-                text=file_count(info.files),
+                text=self._translate(
+                    "file_one" if info.files == 1 else "file_many",
+                    n=info.files,
+                ),
                 fill=theme.TEXT,
                 font=self._small,
             )

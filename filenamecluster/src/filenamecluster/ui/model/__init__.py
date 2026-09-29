@@ -1,15 +1,45 @@
-"""UI model: the session for one window, and the built-in option values.
+"""Session state and the built-in option rows.
+
+Other packages import these names from ``filenamecluster.ui.model``.
+They do not import the modules inside this package directly.
 
 Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 Design: ``docs/architecture.md``.
 """
 
-from filenamecluster.ui.model.session import (
-    DEFAULTS,
-    OPTIONS,
-    AppModel,
-    describe_model,
-    hours,
+from .display import (
+    ChooseStatus,
+    DayInfo,
+    LearnedKind,
+    LearnedSummary,
+    OptionProblemStatus,
+    PreviewStaysStatus,
+    ReadFailureStatus,
+    SkippedReason,
+    SummaryStatus,
+    Topic,
+    ValueProblemStatus,
+    cover_days,
 )
+from .options import OptionFields
+from .patterns import PatternRow, PatternSnapshot
+from .model import AppModel
 
-__all__ = ["DEFAULTS", "OPTIONS", "AppModel", "describe_model", "hours"]
+__all__ = [
+    "AppModel",
+    "ChooseStatus",
+    "DayInfo",
+    "LearnedKind",
+    "LearnedSummary",
+    "OptionFields",
+    "OptionProblemStatus",
+    "PatternRow",
+    "PatternSnapshot",
+    "PreviewStaysStatus",
+    "ReadFailureStatus",
+    "SkippedReason",
+    "SummaryStatus",
+    "Topic",
+    "ValueProblemStatus",
+    "cover_days",
+]

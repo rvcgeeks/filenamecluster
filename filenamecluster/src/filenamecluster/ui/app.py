@@ -11,32 +11,35 @@ import sys
 import tkinter as tk
 
 from filenamecluster.log import configure, event, log_call, trace_module
-from filenamecluster.ui.controller.actions import AppController
-from filenamecluster.ui.model.session import AppModel
-from filenamecluster.ui.view.theme import prepare_process_dpi
-from filenamecluster.ui.view.window import AppView
+from filenamecluster.core.parser import LIMIT_FIELDS
+from filenamecluster.ui.controller import AppController, SystemFiles, SystemLogging
+from filenamecluster.ui.model import AppModel, OptionFields
+from filenamecluster.ui.view import AppView, prepare_process_dpi
 
 __all__ = ["FileNameClusterApp", "main"]
 
 
 class FileNameClusterApp:
-    """One window. Attribute lookup continues into the controller, view, and model."""
+    """One window: a session, the widgets, and the actions that connect them.
 
-    def __init__(self, root: tk.Tk) -> None:
+    ``disk`` runs folder work. When it is omitted, the window's spinner runs it.
+    """
+
+    def __init__(self, root: tk.Tk, disk=None) -> None:
         self.root = root
         self.model = AppModel()
-        self.view = AppView(root, self.model)
-        self.controller = AppController(self.model, self.view)
-        self.view.controller = self.controller
-        self.view.build()
-
-    def __getattr__(self, name: str):
-        for part in (self.controller, self.view, self.model):
-            try:
-                return getattr(part, name)
-            except AttributeError:
-                continue
-        raise AttributeError(name)
+        self.view = AppView(root)
+        self.view.attach(self.model)
+        self.controller = AppController(
+            self.model,
+            self.view,
+            disk=disk,
+            files=SystemFiles(),
+            logging=SystemLogging(),
+        )
+        self.view.bind(self.controller)
+        self.view.build(OptionFields.FIELDS, LIMIT_FIELDS)
+        self.view.draw()
 
 
 def main() -> int:
@@ -47,8 +50,7 @@ def main() -> int:
     log_call("tkinter.Tk")
     root = tk.Tk()
     log_call("filenamecluster.ui.app.FileNameClusterApp")
-    app = FileNameClusterApp(root)
-    root.after_idle(app._finish_equal_columns)
+    FileNameClusterApp(root)
     root.mainloop()
     return 0
 

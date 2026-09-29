@@ -3,16 +3,11 @@
 import unittest
 
 from filenamecluster.log import log_path
-from filenamecluster.ui.view.about import sections
-from filenamecluster.ui.model.i18n import set_language
+from filenamecluster.ui.view import sections
 
 
 class AboutTests(unittest.TestCase):
-    def tearDown(self):
-        set_language("en")
-
     def test_regex_guide_and_log_path_are_separate_sections(self):
-        set_language("en")
         rendered = sections()
         titles = [title for title, _body in rendered]
         bodies = [body for _title, body in rendered]

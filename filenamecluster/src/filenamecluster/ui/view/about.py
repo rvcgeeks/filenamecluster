@@ -6,9 +6,10 @@ Design: ``docs/architecture.md``.
 """
 
 import sys
+from collections.abc import Callable
 
 from filenamecluster.log import log_path, trace_module
-from filenamecluster.ui.model.i18n import t
+from .i18n import t
 
 SECTION_KEYS: tuple[tuple[str, str], ...] = (
     ("about_what_title", "about_what_body"),
@@ -28,18 +29,18 @@ SECTION_KEYS: tuple[tuple[str, str], ...] = (
 )
 
 
-def sections() -> tuple[tuple[str, str], ...]:
-    """Heading and body for each About section, in the current language."""
+def sections(translate: Callable[..., str] = t) -> tuple[tuple[str, str], ...]:
+    """Heading and body for each About section."""
 
     rendered: list[tuple[str, str]] = []
     for title, body in SECTION_KEYS:
         if body == "about_logging_body":
-            text = t(body, path=str(log_path()))
+            text = translate(body, path=str(log_path()))
         elif body.startswith("about_regex"):
-            text = t(body).format()
+            text = translate(body).format()
         else:
-            text = t(body)
-        rendered.append((t(title), text))
+            text = translate(body)
+        rendered.append((translate(title), text))
     return tuple(rendered)
 
 

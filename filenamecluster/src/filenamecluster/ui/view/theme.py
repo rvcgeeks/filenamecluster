@@ -101,7 +101,7 @@ def sharpen(root: tk.Misc) -> None:
     """
 
     global UI_SCALE
-    backing = _backing_scale()
+    backing = backing_scale()
     try:
         current = float(root.tk.call("tk", "scaling"))
     except (tk.TclError, TypeError, ValueError):
@@ -117,7 +117,7 @@ def sharpen(root: tk.Misc) -> None:
         UI_SCALE = 1.0
 
 
-def _backing_scale() -> float:
+def backing_scale() -> float:
     if sys.platform == "darwin":
         return _mac_backing_scale()
     if sys.platform == "win32":

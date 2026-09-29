@@ -17,7 +17,7 @@ from pathlib import Path
 from tkinter import font as tkfont
 
 from filenamecluster.log import trace_module
-from filenamecluster.ui.view import theme
+from . import theme
 
 DEFAULT_DELAY_MS = 30
 MIN_DELAY_MS = 16
