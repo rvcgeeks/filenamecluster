@@ -92,10 +92,10 @@ Each build does this:
 3. Installs [uv](https://docs.astral.sh/uv/) and the locked dependencies from `filenamecluster/uv.lock`.
 4. On Linux, installs the small libraries Tk needs to open a window.
 5. Checks that Python can `import tkinter`.
-6. Runs `uv run python build.py`. That is PyInstaller. It cannot build a Windows program on Linux, so each job builds only for the computer it is on. The frozen program includes `ui/assets/icon.png` and `ui/assets/spinner.gif`.
+6. Runs `uv run python build.py`. That uses Nuitka, which compiles for the host system, so each job builds only for the computer it is on. The compiled program includes the files under `ui/assets`.
    - Windows: one file, `dist/filenamecluster.exe`
    - Linux: one file, `dist/filenamecluster`
-   - Mac: `dist/filenamecluster.app`. The app is a folder, which is what macOS expects. PyInstaller will not pack a windowed Mac app into one file.
+   - Mac: `dist/filenamecluster.app`. The app is a folder, which is what macOS expects.
 7. Renames that program with the version. On a Mac it also wraps the app in a disk image, because the Release needs a single file.
 8. Uploads that one file as an Actions artifact. The artifact name is the filename, for example `filenamecluster-v0.1.2-windows.exe`.
 

@@ -1,7 +1,7 @@
 """Start the Tkinter window.
 
 ``uv run filenamecluster`` and ``python -m filenamecluster`` both call
-``filenamecluster.ui.app.main``. PyInstaller freezes this file.
+``filenamecluster.ui.app.main``. Nuitka compiles this file for releases.
 
 Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 Introduction: ``readme.md``.

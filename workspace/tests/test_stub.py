@@ -71,6 +71,7 @@ def test_clean_keeps_filled_files_and_their_folders(tmp_path: Path) -> None:
     (keep / "empty.jpg").touch()
     (tmp_path / "top-filled.jpg").write_text("content", encoding="utf-8")
     (tmp_path / "loose.jpg").touch()
+    (tmp_path / ".gitkeep").touch()
     (tmp_path / "filenames.txt").write_text("listing\n", encoding="utf-8")
     nested = tmp_path / "empty-dir" / "nested"
     nested.mkdir(parents=True)
@@ -80,6 +81,7 @@ def test_clean_keeps_filled_files_and_their_folders(tmp_path: Path) -> None:
     assert (keep / "filled.jpg").read_text(encoding="utf-8") == "content"
     assert (tmp_path / "top-filled.jpg").is_file()
     assert (tmp_path / "filenames.txt").is_file()
+    assert (tmp_path / ".gitkeep").is_file()
     assert not (keep / "empty.jpg").exists()
     assert not (tmp_path / "loose.jpg").exists()
     assert not (tmp_path / "empty-dir").exists()

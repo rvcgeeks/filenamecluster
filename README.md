@@ -100,7 +100,7 @@ filenamecluster/
   workspace/            uv project that runs the app; data/ and filenames.txt
 ```
 
-`workspace` installs `filenamecluster` from the sibling directory. `uv run stub create filenames.txt` builds empty stand-in files in `workspace/data` from a `dir` listing, `ls -l` output, or one name per line. `uv run stub clean` deletes empty files there, then empty folders, and leaves anything that still has content.
+`workspace` installs `filenamecluster` from the sibling directory. `uv run stub create filenames.txt` builds empty stand-in files in `workspace/data` from a `dir` listing, `ls -l` output, or one name per line. `uv run stub clean` deletes empty files there, then empty folders, and leaves anything that still has content. `.gitkeep` is never deleted.
 
 ## Tests
 

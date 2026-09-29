@@ -1,4 +1,4 @@
-# Builds one PyInstaller program on Linux, Windows, and macOS.
+# Builds one Nuitka program on Linux, Windows, and macOS.
 # A tag named v* (for example v0.1.0) publishes those files on a GitHub
 # Release, each with a direct download link. A manual run only stores
 # Actions artifacts. Nothing is published to PyPI.

@@ -1,6 +1,6 @@
 [project]
 name = "filenamecluster"
-version = "0.1.3"
+version = "0.1.4"
 description = "Tkinter app that clusters camera-roll files into chronological events using the timestamp in each filename, or picture, video, or PDF creation metadata when the name has none."
 authors = [{ name = "Rajas Chavadekar", email = "rvchavadekar@gmail.com" }]
 requires-python = ">=3.11"
@@ -18,10 +18,11 @@ filenamecluster = "filenamecluster.ui.app:main"
 
 [dependency-groups]
 dev = [
+    "imageio>=2.37",
+    "nuitka>=2.7",
     "pytest>=8.3",
     "pytest-cov>=6.0",
     "pytest-html>=4.1",
-    "pyinstaller>=6.11",
 ]
 
 [build-system]

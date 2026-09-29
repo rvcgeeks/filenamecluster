@@ -132,14 +132,15 @@ toml = [
 
 [[package]]
 name = "filenamecluster"
-version = "0.1.3"
+version = "0.1.4"
 source = { editable = "../filenamecluster" }
 
 [package.metadata]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pyinstaller", specifier = ">=6.11" },
+    { name = "imageio", marker = "sys_platform == 'darwin'", specifier = ">=2.37" },
+    { name = "nuitka", specifier = ">=2.7" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "pytest-cov", specifier = ">=6.0" },
     { name = "pytest-html", specifier = ">=4.1" },
@@ -379,7 +380,7 @@ wheels = [
 
 [[package]]
 name = "workspace"
-version = "0.1.3"
+version = "0.1.4"
 source = { editable = "." }
 dependencies = [
     { name = "filenamecluster" },

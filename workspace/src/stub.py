@@ -13,7 +13,7 @@ The listing may be a Windows ``dir`` dump, ``ls -l`` output, or one filename
 per line. A relative listing path is resolved from the directory that holds
 ``pyproject.toml``, beside the ``data`` folder. Files are created in ``data``.
 ``clean`` deletes empty files there and then empty folders, and leaves
-anything that still has content.
+anything that still has content. ``.gitkeep`` is never deleted.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ def _project_root() -> Path:
 
 PROJECT = _project_root()
 DATA = PROJECT / "data"
-PROTECTED = {"stub.py", "filenames.txt"}
+PROTECTED = {"stub.py", "filenames.txt", ".gitkeep"}
 
 _DIR_ENTRY = re.compile(
     r"^(?P<date>\d{2}-\d{2}-\d{4})\s+"
@@ -100,7 +100,7 @@ def main(argv: list[str] | None = None) -> int:
         description=(
             "Under data/, delete files whose size is 0, then delete folders "
             "that are empty after that. A file with any content is kept, and "
-            "so is any folder that still holds one."
+            "so is any folder that still holds one. .gitkeep is never deleted."
         ),
         epilog="Example:\n  uv run stub clean",
     )

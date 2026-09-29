@@ -4,6 +4,13 @@ Rajas Chavadekar (rvchavadekar@gmail.com)
 
 This file records user-visible changes to File Name Cluster. Versions follow semantic versioning.
 
+## 0.1.4
+
+### Changed
+
+- Windows, macOS, and Linux programs are now compiled with Nuitka. The downloads stay the same: one Windows file, one Linux file, and a macOS app.
+- The package version is now `0.1.4`.
+
 ## 0.1.3
 
 ### Changed

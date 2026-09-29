@@ -7,10 +7,11 @@
 **/*.egg-info/
 **/.DS_Store
 
-# PyInstaller: uv run build
-**/pyinstaller/
+# Nuitka: uv run python build.py
 **/dist/
-**/*.spec
+**/*.build/
+**/*.dist/
+**/*.onefile-build/
 
 workspace/data/**
 !workspace/data/.gitkeep
