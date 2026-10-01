@@ -11,6 +11,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from filenamecluster.log import trace_module
+from filenamecluster.ui.model import OptionFields
 
 _MEANING = {
     "within_hours": "model_within",
@@ -63,15 +64,15 @@ class OptionsTab:
         self._suppress_fields = True
         self.option_vars = {
             key: tk.StringVar(self.host.root, "")
-            for key, *_rest in self.host.hour_fields
+            for key, *_rest in OptionFields.FIELDS
         }
         self.limit_vars = {
             key: tk.StringVar(self.host.root, "")
-            for key, *_rest in self.host.limit_fields
+            for key, *_rest in OptionFields.LIMITS
         }
         gaps = self.kit.text(ttk.LabelFrame(columns, padding=8), "safety_limits")
         self.option_inputs: dict[str, ttk.Spinbox] = {}
-        for row, (key, label_key, hint_key, bounds) in enumerate(self.host.hour_fields):
+        for row, (key, label_key, hint_key, bounds) in enumerate(OptionFields.FIELDS):
             low, high, step = bounds
             self.option_inputs[key] = self.kit.option_row(
                 gaps, row, label_key, hint_key, self.option_vars[key], low, high, step
@@ -82,7 +83,7 @@ class OptionsTab:
 
         limits = self.kit.text(ttk.LabelFrame(columns, padding=8), "years_frame")
         self.limit_inputs: dict[str, ttk.Spinbox] = {}
-        for row, (key, _label, _hint, low, high) in enumerate(self.host.limit_fields):
+        for row, (key, _label, _hint, low, high) in enumerate(OptionFields.LIMITS):
             self.limit_inputs[key] = self.kit.option_row(
                 limits, row, f"limit_{key}", f"limit_{key}_hint", self.limit_vars[key], low, high, 1
             )

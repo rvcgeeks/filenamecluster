@@ -1,4 +1,4 @@
-"""Apply and Flatten: confirm, then move the files.
+"""Apply and Flatten: confirm, resolve name clashes, then move the files.
 
 Core moves the files. This class asks the window and records the result.
 
@@ -9,11 +9,13 @@ Design: ``docs/architecture.md``.
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from filenamecluster.core.operations import organize
 from filenamecluster.log import event, log_call, trace_module
 from filenamecluster.ui.model import PreviewStaysStatus
+from .clashes import ClashResolver
 from .ports import DialogPort, DiskPort
 from .requests import (
     Applied,
@@ -39,6 +41,7 @@ class FolderRelocation:
         self.ui = ui
         self.disk = disk
         self.refresh = refresh
+        self._clashes = ClashResolver(ui)
 
     def apply(self) -> None:
         if self.model.busy or self.model.directory is None:
@@ -90,15 +93,16 @@ class FolderRelocation:
         clusters = result.clusters
         files, events = result.file_count, len(result.clusters)
 
-        def finish(outcome: Success | Failure) -> None:
+        def finish(outcome: Success | Failure, skipped: int) -> None:
             if isinstance(outcome, Failure):
-                error = outcome.error
-                if isinstance(error, (OSError, ValueError)):
-                    self.ui.tell(CouldNotMove(str(error)))
-                    event("apply_failed", path=str(directory))
-                    self.refresh(wait=Wait.AFTER_ERROR)
-                    return
-                raise error
+                self._failed(outcome, directory, CouldNotMove, "apply_failed")
+                return
+            kept = files - skipped
+            if skipped:
+                self.ui.tell(Applied(kept, events, skipped=skipped))
+                event("apply_finished", path=str(directory), files=kept, events=events, skipped=skipped)
+                self.refresh(wait=Wait.PREVIEW)
+                return
             self.ui.tell(Applied(files, events))
             self.model.set_actions_and_status(
                 False,
@@ -107,12 +111,24 @@ class FolderRelocation:
             )
             event("apply_finished", path=str(directory), files=files, events=events)
 
-        log_call("filenamecluster.core.operations.organize.move_into_cluster_folders")
-        self.disk(
-            Wait.APPLY,
-            lambda: organize.move_into_cluster_folders(directory, clusters),
-            finish,
-        )
+        def after_plan(outcome: Success | Failure) -> None:
+            if isinstance(outcome, Failure):
+                self._failed(outcome, directory, CouldNotMove, "apply_failed")
+                return
+            self._commit(
+                directory,
+                outcome.value.clashes,
+                Wait.APPLY,
+                lambda replacing: organize.move_into_cluster_folders(
+                    directory, clusters, replacing=replacing
+                ),
+                finish,
+                "apply_cancelled",
+                "filenamecluster.core.operations.organize.move_into_cluster_folders",
+            )
+
+        log_call("filenamecluster.core.operations.organize.plan_cluster_moves")
+        self.disk(Wait.NAME_CHECK, lambda: organize.plan_cluster_moves(directory, clusters), after_plan)
 
     def _confirm_flatten(self, directory: Path, folders) -> None:
         """Ask, after the folder list, whether to move the files back."""
@@ -120,26 +136,61 @@ class FolderRelocation:
         if not folders:
             self.ui.tell(NothingToFlatten())
             return
-        if not self.ui.ask(FlattenAsk(len(folders), directory)):
+        noted = sum(1 for name in folders if organize.folder_note(name))
+        if not self.ui.ask(FlattenAsk(len(folders), directory, noted=noted)):
             event("flatten_cancelled", path=str(directory))
             return
 
-        def finish(outcome: Success | Failure) -> None:
+        def finish(outcome: Success | Failure, _skipped: int) -> None:
             if isinstance(outcome, Failure):
-                error = outcome.error
-                if isinstance(error, (OSError, ValueError)):
-                    self.ui.tell(CouldNotFlatten(str(error)))
-                    event("flatten_failed", path=str(directory))
-                    self.refresh(wait=Wait.AFTER_ERROR)
-                    return
-                raise error
+                self._failed(outcome, directory, CouldNotFlatten, "flatten_failed")
+                return
             moved = outcome.value
             self.ui.tell(Flattened(moved, directory.name))
             event("flatten_finished", path=str(directory), moved=moved)
             self.refresh(wait=Wait.AFTER_FLATTEN)
 
-        log_call("filenamecluster.core.operations.organize.flatten_cluster_folders")
-        self.disk(Wait.FLATTEN, lambda: organize.flatten_cluster_folders(directory), finish)
+        def after_plan(outcome: Success | Failure) -> None:
+            if isinstance(outcome, Failure):
+                self._failed(outcome, directory, CouldNotFlatten, "flatten_failed")
+                return
+            self._commit(
+                directory,
+                outcome.value.clashes,
+                Wait.FLATTEN,
+                lambda replacing: organize.flatten_cluster_folders(directory, replacing=replacing),
+                finish,
+                "flatten_cancelled",
+                "filenamecluster.core.operations.organize.flatten_cluster_folders",
+            )
+
+        log_call("filenamecluster.core.operations.organize.plan_flatten_moves")
+        self.disk(Wait.NAME_CHECK, lambda: organize.plan_flatten_moves(directory), after_plan)
+
+    def _commit(self, directory, clashes, wait, commit, finish, cancel_name: str, call_name: str) -> None:
+        """Ask about each clash, then move on the disk thread."""
+
+        replacing = self._clashes.replacing(clashes)
+        if replacing is None:
+            event(cancel_name, path=str(directory))
+            return
+        keys = {path.resolve() for path in replacing}
+        skipped = sum(1 for clash in clashes if clash.source.resolve() not in keys)
+
+        def wrapped(outcome: Success | Failure) -> None:
+            finish(outcome, skipped)
+
+        log_call(call_name)
+        self.disk(wait, lambda: commit(replacing), wrapped)
+
+    def _failed(self, outcome: Failure, directory: Path, notice: Callable, name: str) -> None:
+        error = outcome.error
+        if isinstance(error, (OSError, ValueError)):
+            self.ui.tell(notice(str(error)))
+            event(name, path=str(directory))
+            self.refresh(wait=Wait.AFTER_ERROR)
+            return
+        raise error
 
 
 trace_module(sys.modules[__name__])

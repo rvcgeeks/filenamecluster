@@ -119,8 +119,6 @@ def _avi_timestamp(handle, min_year: int, max_year: int) -> datetime | None:
             return None
         kind = raw[:4]
         size = int.from_bytes(raw[4:8], "little")
-        if size < 0:
-            return None
         if kind == b"LIST" and size >= 4:
             list_type = handle.read(4)
             inner = size - 4

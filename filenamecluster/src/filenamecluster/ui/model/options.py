@@ -10,6 +10,7 @@ import sys
 from datetime import timedelta
 
 from filenamecluster.core.algorithm.cluster import ClusterParams
+from filenamecluster.core.parser import LIMIT_FIELDS
 from filenamecluster.log import trace_module
 
 
@@ -22,6 +23,7 @@ class OptionFields:
         ("floor", "floor_label", "floor_hint", (0.5, 168, 0.5)),
         ("ceiling", "ceiling_label", "ceiling_hint", (1, 8760, 1)),
     )
+    LIMITS = LIMIT_FIELDS
 
     @staticmethod
     def hours(delta: timedelta) -> float:

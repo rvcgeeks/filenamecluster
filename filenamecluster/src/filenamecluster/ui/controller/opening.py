@@ -52,7 +52,7 @@ class OpenActions:
         if not 0 <= index < len(self._model.result.clusters):
             return
         cluster = self._model.result.clusters[index]
-        folder = organize.event_folder(self._model.directory, cluster.name)
+        folder = organize.find_event_folder(self._model.directory, cluster)
         if folder is not None:
             log_call("filenamecluster.ui.controller.files.open_folder_window")
             self._files.open_folder_window(folder)

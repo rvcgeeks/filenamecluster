@@ -5,6 +5,8 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from filenamecluster.log import set_logging_enabled
 from filenamecluster.ui.app import FileNameClusterApp
 from filenamecluster.ui.view import use_script
@@ -81,7 +83,8 @@ class WindowCase(unittest.TestCase):
         if self.ALBUM:
             (self.folder / "album").mkdir()
         self.root = make_root()
-        self.app = FileNameClusterApp(self.root, disk=run_inline)
+        self.app = FileNameClusterApp(self.root)
+        self.app.view.run_work = run_inline
         if self.LOAD:
             self.app.controller.load_folder(self.folder)
         self.root.update_idletasks()
@@ -92,3 +95,33 @@ class WindowCase(unittest.TestCase):
         self.assertEqual(self.root.state(), "withdrawn")
         self.root.destroy()
         self.tmp.cleanup()
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session, exitstatus):
+    """The core package is required to be fully covered. The rest of the suite stays at 80%."""
+
+    if session.config.getoption("no_cov", default=False):
+        return
+    plugin = session.config.pluginmanager.getplugin("_cov")
+    cov = getattr(plugin, "cov", None)
+    if cov is None:
+        return
+    root = Path(__file__).resolve().parents[1] / "src" / "filenamecluster" / "core"
+    measured = {Path(name).resolve(): name for name in cov.get_data().measured_files()}
+    gaps: list[str] = []
+    for source in sorted(root.rglob("*.py")):
+        filename = measured.get(source.resolve())
+        if filename is None:
+            gaps.append(f"{source.relative_to(root)} was not imported")
+            continue
+        _name, _statements, _excluded, missing, _text = cov.analysis2(filename)
+        if missing:
+            gaps.append(f"{source.relative_to(root)} missing {missing}")
+    if not gaps or session.exitstatus or exitstatus:
+        return
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    reporter.write_line("core coverage is below 100%:")
+    for gap in gaps:
+        reporter.write_line(f"  {gap}")
+    session.exitstatus = 1

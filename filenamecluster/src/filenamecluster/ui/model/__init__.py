@@ -7,6 +7,7 @@ Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 Design: ``docs/architecture.md``.
 """
 
+from .clash import ClashChoice, NameClash
 from .display import (
     ChooseStatus,
     DayInfo,
@@ -28,6 +29,8 @@ from .model import AppModel
 __all__ = [
     "AppModel",
     "ChooseStatus",
+    "ClashChoice",
+    "NameClash",
     "DayInfo",
     "LearnedKind",
     "LearnedSummary",

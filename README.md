@@ -36,9 +36,9 @@ From `workspace`, with [uv](https://docs.astral.sh/uv/):
 uv run filenamecluster
 ```
 
-The interpreter is the uv-managed Python, which has Tk. Choose a folder in the window. A dialog plays `spinner.gif` while that folder is read, then the preview appears. **Apply clustering** and **Flatten clustering** each show the spinner twice: first while the folder is read, before the confirmation of which files will move, and again after you confirm, while the files are moved. The spinner is a borderless, see-through overlay with a large bold line that says what is happening, for example whether event clusters are being calculated or files are being moved. The work runs on a background thread, so the window stays responsive. Buttons and option controls are disabled until each wait finishes. Other subfolders are left alone.
+The interpreter is the uv-managed Python, which has Tk. Choose a folder in the window. A dialog plays `spinner.gif` while that folder is read, then the preview appears. **Apply clustering** and **Flatten clustering** each show the spinner while the folder is read, before the confirmation of which files will move. After you confirm, any filename the destination already has opens a replace-or-skip dialog: replace that file, skip it, or, when several names clash, do that for all of them. Closing the dialog moves nothing. The spinner then plays again while the files that will move are moved. The spinner is a borderless, see-through overlay with a large bold line that says what is happening, for example whether event clusters are being calculated or files are being moved. The work runs on a background thread, so the window stays responsive. Buttons and option controls are disabled until each wait finishes. Other subfolders are left alone.
 
-After Apply, the preview stays until you choose another folder. Copy a later batch into the same folder and click **Update preview**. Files already inside event folders are included. A new file joins an existing event when the pause is short enough, or starts a new one when it is not. Apply then moves only the files that need a different folder.
+After Apply, the preview stays until you choose another folder. Copy a later batch into the same folder and click **Update preview**. Files already inside event folders are included. A new file joins an existing event when the pause is short enough, or starts a new one when it is not. Apply then moves only the files that need a different folder. A new photo can join an older event and extend that event’s time span; the event folder is then renamed. Words added before the dates, after them, or on both sides stay on the updated folder. A new photo sitting loose in the album does not remove those words. When photos from two such folders fall into one event, the words kept are the ones on the folder that already held more of those photos. When both folders held the same number, the words on the earlier photos stay. If one such folder becomes two events, both new folders keep the same words. Flatten warns that those words are removed with the folder. If the destination already has the same filename, Apply asks whether to replace it or skip it, instead of stopping.
 
 Double-click the selected orange or yellow event in the calendar, either timeline, or the cluster list to open its folder in a new file-manager window. The app explains when that folder has not been created yet. Double-click a file in **Day detail** to open it with the operating system's default application.
 
@@ -90,6 +90,8 @@ Event folders are named so a plain sort follows time:
 2 09-11-2015 20.49.41 to 12-11-2015 10.24.42
 ```
 
+Words may sit before those dates, after them, or on both sides, separated by a space. `Hyderabad trip 1 24-11-2015 10.01.25 to 18.50.08` and `2 09-11-2015 20.49.41 to 12-11-2015 10.24.42 evening` are still event folders. The cluster list shows the dates. The folder on disk keeps the words, and double-click opens that folder. The Skipped tab does not list that folder, because its files are already in the events. Apply keeps the words when it updates the folder. Flatten removes them, and the confirmation says so before anything moves.
+
 ## Layout
 
 ```text
@@ -110,4 +112,4 @@ From `filenamecluster`:
 uv run pytest
 ```
 
-Coverage is written to `filenamecluster/reports/` and is required to stay at or above 80%. The tests follow the same folders as `src/filenamecluster`, including `ui/model`, `ui/view`, and `ui/controller`. UI tests build real Tk widgets on a root that remains withdrawn, so the suite never presents an application window.
+Coverage is written to `filenamecluster/reports/`. The whole suite is required to stay at or above 80%. The `filenamecluster.core` package, which scans, clusters, and moves files, is required to stay at 100%. The tests follow the same folders as `src/filenamecluster`, including `ui/model`, `ui/view`, and `ui/controller`. UI tests build real Tk widgets on a root that remains withdrawn, so the suite never presents an application window.

@@ -90,12 +90,16 @@ class MoveTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 move_into_cluster_folders(root, named)
 
+            self.assertFalse((root / named[0].name).exists())
+
             (root / "a.jpg").write_bytes(b"a")
             folder = root / named[0].name
-            self.assertTrue(folder.is_dir())
+            folder.mkdir()
             (folder / "a.jpg").write_bytes(b"already")
             with self.assertRaises(FileExistsError):
                 move_into_cluster_folders(root, named)
+            self.assertEqual((root / "a.jpg").read_bytes(), b"a")
+            self.assertEqual((folder / "a.jpg").read_bytes(), b"already")
 
             unsafe = name_clusters(
                 [Cluster((stamp("../a.jpg", datetime(2024, 1, 1, 10, 0, 0)),))]

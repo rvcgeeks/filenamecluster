@@ -13,6 +13,10 @@ class RunnerTests(WindowCase):
     ALBUM = False
     LOAD = True
 
+    def setUp(self):
+        super().setUp()
+        del self.app.view.run_work
+
     def run_visible(self, work):
         """Start ``work`` under the spinner and run the scheduled polls by hand."""
 

@@ -8,8 +8,6 @@ from filenamecluster.ui.controller import (
     PatternBlank,
     PatternInvalid,
     PatternValid,
-    SystemFiles,
-    SystemLogging,
 )
 from filenamecluster.ui.model import AppModel
 from conftest import WindowCase
@@ -54,9 +52,7 @@ class PatternAlertTests(unittest.TestCase):
     def setUp(self):
         self.ui = RecordingUi()
         self.model = AppModel()
-        self.controller = AppController(
-            self.model, self.ui, files=SystemFiles(), logging=SystemLogging()
-        )
+        self.controller = AppController(self.model, self.ui)
 
     def test_a_compiling_row_is_reported_valid(self):
         self.controller.validate_pattern("Dashed clock", TimestampPatterns().clock_separated)

@@ -94,7 +94,7 @@ class ControllerTests(WindowCase):
             patch.object(Dialogs._messagebox, "showinfo"),
         ):
             self.app.controller.apply_clustering()
-        self.assertEqual(keys, [Wait.APPLY_CHECK, Wait.APPLY])
+        self.assertEqual(keys, [Wait.APPLY_CHECK, Wait.NAME_CHECK, Wait.APPLY])
 
         keys.clear()
         with (
@@ -103,8 +103,8 @@ class ControllerTests(WindowCase):
             patch.object(Dialogs._messagebox, "showinfo"),
         ):
             self.app.controller.flatten_clustering()
-        self.assertEqual(keys, [Wait.FLATTEN_CHECK, Wait.FLATTEN, Wait.AFTER_FLATTEN])
-        for key in ("busy_open", "busy_preview", "busy_apply_check", "busy_apply",
+        self.assertEqual(keys, [Wait.FLATTEN_CHECK, Wait.NAME_CHECK, Wait.FLATTEN, Wait.AFTER_FLATTEN])
+        for key in ("busy_open", "busy_preview", "busy_apply_check", "busy_apply", "busy_name_check",
                     "busy_flatten_check", "busy_flatten", "busy_after_flatten", "busy_after_error"):
             self.assertNotEqual(t(key), key)
         self.assertIn("No clusters", t("busy_flatten_check"))

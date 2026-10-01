@@ -10,6 +10,7 @@ import sys
 
 from filenamecluster.log import trace_module
 from filenamecluster.ui.controller import Notice, Question
+from filenamecluster.ui.model import NameClash
 
 
 class ViewForwarding:
@@ -78,6 +79,9 @@ class ViewForwarding:
 
     def ask(self, question: Question) -> bool:
         return self.messages.question(question)
+
+    def resolve_clash(self, clash: NameClash) -> None:
+        self.messages.resolve_clash(clash)
 
     def tell(self, notice: Notice) -> None:
         self.messages.present(notice)

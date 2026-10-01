@@ -24,6 +24,7 @@ class Wait(Enum):
     PREVIEW = auto()
     APPLY_CHECK = auto()
     APPLY = auto()
+    NAME_CHECK = auto()
     FLATTEN_CHECK = auto()
     FLATTEN = auto()
     AFTER_FLATTEN = auto()
@@ -68,6 +69,7 @@ class NothingToMove:
 class Applied:
     files: int
     events: int
+    skipped: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,6 +121,7 @@ class ApplyUpdate:
 class FlattenAsk:
     folders: int
     path: Path
+    noted: int = 0
 
 
 Notice = (

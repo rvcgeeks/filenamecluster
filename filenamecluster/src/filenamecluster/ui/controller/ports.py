@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from filenamecluster.log import trace_module
+from filenamecluster.ui.model import NameClash
 from .requests import Notice, Question, Wait
 
 
@@ -24,6 +25,9 @@ class DialogPort(Protocol):
 
     def ask(self, question: Question) -> bool:
         """Ask a yes or no question."""
+
+    def resolve_clash(self, clash: NameClash) -> None:
+        """Ask whether to replace or skip one filename. The view writes the choice."""
 
 
 @runtime_checkable

@@ -13,5 +13,7 @@ class RequestTests(unittest.TestCase):
         self.assertEqual(done.value, 4)
         self.assertIsInstance(failed.error, OSError)
         self.assertEqual(Applied(files=2, events=1).files, 2)
-        self.assertEqual(FlattenAsk(folders=3, path=Path("album")).folders, 3)
+        asked = FlattenAsk(folders=3, path=Path("album"))
+        self.assertEqual(asked.folders, 3)
+        self.assertEqual(asked.noted, 0)
         self.assertIs(Wait.OPEN, Wait.OPEN)

@@ -4,6 +4,21 @@ Rajas Chavadekar (rvchavadekar@gmail.com)
 
 This file records user-visible changes to File Name Cluster. Versions follow semantic versioning.
 
+## 0.1.5
+
+### Added
+
+- An event folder may carry extra words before its dates, after them, or on both sides, for example “Hyderabad trip” in front of the stamp, “Hyderabad Trip” after it, or “Goa” before and “evening” after. The words are separated from the dates by a space. The app still treats that folder as an event folder. The cluster list shows the dates. The folder on disk keeps the words, and double-click opens that folder. **Apply clustering** keeps those words when it updates the folder, including when new photos extend the event and the dates or the leading number change. A new photo copied loose into the album does not remove the words. When photos from two such folders fall into one event, Apply keeps the words from the folder that already held more of those photos. When both folders held the same number, the words on the earlier photos stay. If one such folder becomes two events, both new folders keep the same words. **Flatten clustering** warns, before anything moves, that those words are removed with the folder.
+- **Apply clustering** and **Flatten clustering** no longer stop when the destination already has a filename. A dialog says “The destination already has a file named …”. **Replace the file in the destination** overwrites that file. **Skip this file** leaves both files where they are. When more than one name clashes, **Do this for all (n) conflicts** uses that answer for the rest. Closing the dialog moves nothing. The same question covers a later batch copied beside existing event folders, and Flatten when a loose file already has that name.
+- The package version is now `0.1.5`.
+
+### Changed
+
+- If Apply skips any of those names, the preview is calculated again, so the files that stayed behind remain visible and can be applied later. An Apply that does not skip still leaves the preview in place until you choose another folder or flatten.
+- The About tab, under “Which files are used” and “How to use it”, describes the replace-or-skip question and the extra words on an event folder, in every language.
+- The Skipped tab no longer lists an event folder. A folder whose name contains the event dates, including extra words before or after those dates, stays out of that list. Its files are already in the events. The status line still counts those folders, and Flatten still offers to undo them. Other subfolders, and files with no capture time, still appear under Skipped. The About tab says this in every language.
+- The clustering core (`filenamecluster.core`) is required to stay at 100% test coverage. The rest of the suite stays at or above 80%.
+
 ## 0.1.4
 
 ### Changed

@@ -29,6 +29,7 @@ from filenamecluster.ui.controller import (
     Wait,
 )
 from filenamecluster.ui.model import (
+    NameClash,
     ChooseStatus,
     OptionProblemStatus,
     PreviewStaysStatus,
@@ -58,6 +59,7 @@ _WAITS = {
     Wait.PREVIEW: "busy_preview",
     Wait.APPLY_CHECK: "busy_apply_check",
     Wait.APPLY: "busy_apply",
+    Wait.NAME_CHECK: "busy_name_check",
     Wait.FLATTEN_CHECK: "busy_flatten_check",
     Wait.FLATTEN: "busy_flatten",
     Wait.AFTER_FLATTEN: "busy_after_flatten",
@@ -84,7 +86,18 @@ class Messages:
         elif isinstance(notice, NothingToMove):
             self.tell_info("nothing_to_move_title", "nothing_to_move_body")
         elif isinstance(notice, Applied):
-            self.tell_info("applied_title", "applied_body", files=notice.files, events=notice.events)
+            if notice.skipped:
+                self.tell_info(
+                    "applied_title",
+                    "applied_body_skipped",
+                    files=notice.files,
+                    events=notice.events,
+                    skipped=notice.skipped,
+                )
+            else:
+                self.tell_info(
+                    "applied_title", "applied_body", files=notice.files, events=notice.events
+                )
         elif isinstance(notice, CouldNotMove):
             self.tell_error("could_not_move", notice.detail)
         elif isinstance(notice, NothingToFlatten):
@@ -112,7 +125,10 @@ class Messages:
                 "apply", "apply_update", path=asked.path, files=asked.files, events=asked.events
             )
         if isinstance(asked, FlattenAsk):
-            return self.ask("flatten", "flatten_confirm", folders=asked.folders, path=asked.path)
+            body = "flatten_confirm_notes" if asked.noted else "flatten_confirm"
+            return self.ask(
+                "flatten", body, folders=asked.folders, path=asked.path, noted=asked.noted
+            )
         raise TypeError(f"unknown question {type(asked).__name__}")
 
     def wait_key(self, wait: Wait) -> str:
@@ -120,6 +136,19 @@ class Messages:
 
     def choose_directory(self, initial: Path) -> str:
         return self.host.dialogs.choose_directory(initial)
+
+    def resolve_clash(self, clash: NameClash) -> None:
+        """Translate one destination-name clash and let the dialog write the choice."""
+
+        everyone = self.host.translate("clash_all", count=clash.count) if clash.count > 1 else None
+        self.host.dialogs.ask_name_clash(
+            clash,
+            title=self.host.translate("clash_title"),
+            body=self.host.translate("clash_body", name=clash.name),
+            replace=self.host.translate("clash_replace"),
+            skip=self.host.translate("clash_skip"),
+            everyone=everyone,
+        )
 
     def ask(self, title_key: str, body_key: str, **fields: object) -> bool:
         return self.host.dialogs.ask_yes_no(

@@ -63,6 +63,20 @@ class FolderOpenTests(WindowCase):
         self.assertEqual(opener.call_count, 2)
         self.assertEqual(opener.call_args_list[0].args[0], folder)
 
+    def test_double_click_opens_an_event_folder_with_extra_words(self):
+        with (
+            patch.object(Dialogs._messagebox, "askyesno", return_value=True),
+            patch.object(Dialogs._messagebox, "showinfo"),
+        ):
+            self.app.controller.apply_clustering()
+        cluster = self.app.model.result.clusters[0]
+        noted = self.folder / f"Hyderabad trip {cluster.name}"
+        (self.folder / cluster.name).rename(noted)
+        self.app.controller.select_cluster(0)
+        with patch.object(SystemFiles, "open_folder_window") as opener:
+            self.app.controller.open_cluster_folder(0)
+        opener.assert_called_once_with(noted)
+
     def test_double_click_in_day_detail_opens_the_file(self):
         name = "IMG_20240101_100000.jpg"
         self.app.controller.show_day(date(2024, 1, 1))

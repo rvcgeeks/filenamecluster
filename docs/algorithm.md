@@ -864,6 +864,8 @@ Code: loose files and files already inside event folders are collected in `core/
 > - **Too few examples and no old note?** Use the 36-hour backup rule.
 >
 > Because of this, a new photo taken during an old trip can **join** that trip’s pile, and a new photo from a new day out can **start** a new pile.
+>
+> The event folder can also carry words typed around the dates, before them, after them, or both, separated by a space. Those words are not part of the learning, and the dates in them are not read back into times. That folder is not listed under Skipped. Its files are already in the events. A different subfolder, one whose name does not contain those dates, is listed there and is not entered. When a new photo joins the event and the dates in the folder name change, the words stay. A new photo that is still loose in the album does not choose the words. If two folders with different words become one event, the words kept are from the folder that already held more of the photos. The same number of photos on both sides keeps the words from the earlier photos. If one such folder becomes two events, both new folders keep the same words. Flatten removes the words with the folders, and it warns first.
 
 The saved boundary is a parameter of the decision rule. It is not a prior inside the EM update. `fit` at `core/algorithm/cluster.py` line 149 receives only the new unlabeled log gaps. The saved model is assigned only when that fit returns `None`, at lines 150–153. The options saved beside it are not passed into `fit`.
 

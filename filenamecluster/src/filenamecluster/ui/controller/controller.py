@@ -13,6 +13,7 @@ from pathlib import Path
 from filenamecluster.log import event, trace_module
 from filenamecluster.ui.model import AppModel
 from .files import SystemFiles
+from .logging import SystemLogging
 from .opening import OpenActions
 from .pattern_edits import PatternEdits
 from .ports import DiskPort, LoggingPort, ViewPort
@@ -24,9 +25,11 @@ from .requests import Failure, Success, Wait
 class AppController:
     """Turns a user action into a call on the session or the folder workflow.
 
-    ``ui`` asks a question, shows a dialog, chooses a folder, and can run disk
+    ``ui`` asks a question, shows a dialog, chooses a folder, and runs disk
     work. This class does not name a widget, translate a sentence, or draw.
-    ``disk``, when given, runs that work instead of ``ui.run_work``.
+    It opens files with ``SystemFiles`` and applies the log switch with
+    ``SystemLogging``. ``disk``, when given, runs folder work instead of
+    ``ui.run_work``.
     """
 
     def __init__(
@@ -35,14 +38,14 @@ class AppController:
         ui: ViewPort,
         disk: DiskPort | None = None,
         *,
-        files: SystemFiles,
-        logging: LoggingPort,
+        files: SystemFiles | None = None,
+        logging: LoggingPort | None = None,
     ) -> None:
         self.model = model
         self.ui = ui
         self._disk = disk
-        self._logging = logging
-        self._files = files
+        self._logging = SystemLogging() if logging is None else logging
+        self._files = SystemFiles() if files is None else files
         self._previewing = FolderPreviewing(model, self._dispatch_disk)
         self._relocation = FolderRelocation(
             model,

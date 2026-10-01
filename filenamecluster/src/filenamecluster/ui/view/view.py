@@ -45,8 +45,6 @@ class AppView(ViewForwarding):
         self.options_user_sized = False
         self.placing_columns = False
         self.equal_columns_job: str | None = None
-        self.hour_fields: tuple = ()
-        self.limit_fields: tuple = ()
         self.options_columns = None
         self.folder_text = tk.StringVar(root, self.translate("no_folder"))
         self.status_text = tk.StringVar(root, self.translate("choose_status"))
@@ -107,13 +105,11 @@ class AppView(ViewForwarding):
         self.flush_edits()
         self.actions.remove_pattern_rule(self.patterns.selected_ids())
 
-    def build(self, hours, limits) -> None:
+    def build(self) -> None:
         """Create the header, the status line, and the four tabs."""
 
         if self.actions is None:
             raise RuntimeError("controller is not attached")
-        self.hour_fields = tuple(hours)
-        self.limit_fields = tuple(limits)
         root = self.root
         root.title(self.translate("app_title"))
         root.geometry("1360x880")
@@ -173,7 +169,7 @@ class AppView(ViewForwarding):
             self.unlock_inputs()
 
     def run_work(self, wait: Wait, work, on_done) -> None:
-        """Run disk work under the spinner. Tests inject their own runner on the controller."""
+        """Run disk work under the spinner. Tests may replace this method."""
 
         self.runner.start(self.messages.wait_key(wait), work, on_done)
 

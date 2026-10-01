@@ -16,20 +16,10 @@ from datetime import datetime
 from pathlib import Path
 
 from filenamecluster.log import detail, trace_module
+from .folders import is_cluster_folder_name
 from .patterns import CompiledTimestampPatterns, TimestampPatterns
 
 MODEL_NAME = "filenamecluster-model.json"
-
-_EVENT_FOLDER = re.compile(
-    r"^\d+ \d{2}-\d{2}-\d{4} \d{2}\.\d{2}\.\d{2} to "
-    r"(?:\d{2}-\d{2}-\d{4} )?\d{2}\.\d{2}\.\d{2}$"
-)
-
-
-def is_cluster_folder_name(name: str) -> bool:
-    """True when ``name`` is a folder this tool would create for an event."""
-
-    return bool(_EVENT_FOLDER.fullmatch(name))
 
 
 @dataclass(frozen=True, slots=True)

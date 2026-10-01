@@ -30,19 +30,19 @@ class PreviewFacts:
         tuple[tuple[str, SkippedReason], ...],
         tuple[tuple[str, SkippedReason], ...],
     ]:
-        """Folder rows and file rows with semantic reasons."""
+        """Folder rows and file rows with semantic reasons.
+
+        A folder whose name contains an event-folder stamp is already
+        clustered, so it is not a skipped row. Another subfolder is.
+        """
 
         result = self.result
         if result is None:
             return (), ()
         folders = tuple(
-            (
-                name,
-                SkippedReason.EVENT_FOLDER
-                if is_cluster_folder_name(name)
-                else SkippedReason.SUBFOLDER,
-            )
+            (name, SkippedReason.SUBFOLDER)
             for name in result.ignored_directories
+            if not is_cluster_folder_name(name)
         )
         files = tuple(
             (name, SkippedReason.NO_TIMESTAMP)

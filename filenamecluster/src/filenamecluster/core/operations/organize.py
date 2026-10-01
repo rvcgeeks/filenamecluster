@@ -8,7 +8,8 @@ Cluster folders are named so a plain lexical sort follows time:
 * same calendar day: ``1 12-08-2026 22.34.11 to 02.56.23``
 * several days: ``1 12-08-2026 22.34.11 to 17-08-2026 02.56.23``
 
-The number is the chronological position, starting at 1.
+The number is the chronological position, starting at 1. Words placed
+before or after that stamp are kept when Apply updates the folder.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from __future__ import annotations
 import sys
 from filenamecluster.log import detail, trace_module
 
-import shutil
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -65,90 +66,72 @@ def name_clusters(clusters: list[Cluster] | tuple[Cluster, ...]) -> list[NamedCl
     ]
 
 
+def plan_cluster_moves(root: Path | str, clusters: list[NamedCluster] | tuple[NamedCluster, ...]):
+    """The moves Apply would make, including filenames the destination already has."""
+
+    from filenamecluster.core.operations.placement import plan_cluster_moves as plan
+
+    return plan(root, _keeping_notes(root, clusters))
+
+
+def plan_flatten_moves(root: Path | str):
+    """The moves Flatten would make, including filenames the folder already has."""
+
+    from filenamecluster.core.operations.placement import plan_flatten_moves as plan
+
+    return plan(root)
+
+
 def move_into_cluster_folders(
     root: Path | str,
     clusters: list[NamedCluster] | tuple[NamedCluster, ...],
+    replacing: Collection[Path] | None = None,
 ) -> list[Path]:
     """Create one folder per cluster under ``root`` and move its files in.
 
-    Names must be a single path component. Existing destination files are
-    left untouched and reported as ``FileExistsError``.
+    Names must be a single path component. When ``replacing`` is omitted, a
+    destination that already has the filename is left untouched and reported
+    as ``FileExistsError`` before anything is moved. When ``replacing`` is
+    given, those source paths overwrite the destination and every other
+    clash is left where it is.
     """
 
-    directory = Path(root)
-    if not directory.is_dir():
-        raise NotADirectoryError(directory)
-    detail("move_started", path=str(directory), events=len(clusters))
+    from filenamecluster.core.operations.placement import (
+        commit_cluster_moves,
+        plan_cluster_moves as plan,
+    )
 
-    created: list[Path] = []
-    kept: set[Path] = set()
-    for cluster in clusters:
-        folder = directory / cluster.name
-        folder.mkdir(exist_ok=True)
-        detail("event_folder_ready", name=cluster.name, files=len(cluster.files))
-        created.append(folder)
-        kept.add(folder.resolve())
-        for item in cluster.files:
-            filename = _single_component(item.name)
-            source = _source_path(directory, item, filename)
-            if not source.is_file():
-                detail("move_missing", source=str(source))
-                raise FileNotFoundError(source)
-            target = folder / filename
-            if _same_file(source, target):
-                detail("file_already_placed", path=str(target))
-                continue
-            if target.exists():
-                detail("move_blocked", source=str(source), target=str(target))
-                raise FileExistsError(target)
-            shutil.move(str(source), str(target))
-            detail("file_moved", source=str(source), target=str(target))
-    _remove_empty_event_folders(directory, kept)
-    detail("move_finished", folders=len(created))
-    return created
+    clusters = _keeping_notes(root, clusters)
+    if replacing is None:
+        planned = plan(root, clusters)
+        if planned.clashes:
+            clash = planned.clashes[0]
+            detail("move_blocked", source=str(clash.source), target=str(clash.target))
+            raise FileExistsError(clash.target)
+        replacing = ()
+    return commit_cluster_moves(root, clusters, replacing)
 
 
-def flatten_cluster_folders(root: Path | str) -> int:
+def flatten_cluster_folders(root: Path | str, replacing: Collection[Path] | None = None) -> int:
     """Move files out of event folders back into ``root`` and remove those folders.
 
     Only immediate subfolders whose names match an event folder are touched.
-    Other folders stay. A name that already exists in ``root`` is reported as
-    ``FileExistsError`` and nothing is moved. Returns how many files moved.
+    Other folders stay. When ``replacing`` is omitted, a name that already
+    exists in ``root`` is reported as ``FileExistsError`` and nothing is
+    moved. When ``replacing`` is given, those source paths overwrite and
+    every other clash stays in its event folder. Returns how many files moved.
     """
 
-    directory = Path(root)
-    if not directory.is_dir():
-        raise NotADirectoryError(directory)
-    detail("flatten_started", path=str(directory))
+    from filenamecluster.core.operations.placement import commit_flatten_moves
 
-    folders = [
-        entry
-        for entry in directory.iterdir()
-        if entry.is_dir() and is_cluster_folder_name(entry.name)
-    ]
-    moves: list[tuple[Path, Path]] = []
-    for folder in folders:
-        for entry in folder.iterdir():
-            if not entry.is_file():
-                continue
-            target = directory / _single_component(entry.name)
-            if target.exists():
-                detail("flatten_blocked", source=str(entry), target=str(target))
-                raise FileExistsError(target)
-            moves.append((entry, target))
-    detail("flatten_planned", files=len(moves), folders=len(folders))
-    for source, target in moves:
-        shutil.move(source, target)
-        detail("file_moved", source=str(source), target=str(target))
-    for folder in folders:
-        try:
-            folder.rmdir()
-            detail("event_folder_removed", name=folder.name)
-        except OSError:
-            detail("event_folder_kept", name=folder.name)
-            continue
-    detail("flatten_finished", moved=len(moves))
-    return len(moves)
+    if replacing is None:
+        planned = plan_flatten_moves(root)
+        if planned.clashes:
+            clash = planned.clashes[0]
+            detail("flatten_blocked", source=str(clash.source), target=str(clash.target))
+            raise FileExistsError(clash.target)
+        replacing = ()
+    return commit_flatten_moves(root, replacing)
 
 
 def is_folder(path: Path | str) -> bool:
@@ -165,6 +148,22 @@ def event_folder_names(directory: Path | str) -> list[str]:
         for entry in Path(directory).iterdir()
         if entry.is_dir() and is_cluster_folder_name(entry.name)
     ]
+
+
+def folder_note(name: str) -> tuple[str, str] | None:
+    """Words before and after an event-folder stamp, or ``None`` when absent."""
+
+    from filenamecluster.core.parser.folders import folder_note as note
+
+    return note(name)
+
+
+def find_event_folder(directory: Path | str, cluster: NamedCluster) -> Path | None:
+    """The event folder for ``cluster``, including one renamed with a note."""
+
+    from filenamecluster.core.operations.notes import find_event_folder as find
+
+    return find(directory, cluster)
 
 
 def event_folder(directory: Path | str, name: str) -> Path | None:
@@ -201,6 +200,22 @@ def locate_file(directory: Path | str, item: TimestampedFile, cluster_name: str)
     return None
 
 
+def _keeping_notes(root: Path | str, clusters: list[NamedCluster] | tuple[NamedCluster, ...]):
+    """Copy each cluster, using a folder name that still carries its note."""
+
+    from filenamecluster.core.operations.notes import noted_name
+
+    directory = Path(root)
+    renamed: list[NamedCluster] = []
+    for cluster in clusters:
+        name = noted_name(directory, cluster)
+        if name == cluster.name:
+            renamed.append(cluster)
+            continue
+        renamed.append(NamedCluster(number=cluster.number, name=name, files=cluster.files))
+    return renamed
+
+
 def _single_component(name: str) -> str:
     if not name or name != Path(name).name or name in {".", ".."}:
         raise ValueError(f"unsafe filename: {name}")
@@ -231,19 +246,17 @@ def _same_file(source: Path, target: Path) -> bool:
 
 
 def _remove_empty_event_folders(directory: Path, kept: set[Path]) -> None:
-    """Drop event folders that this apply emptied and no longer uses."""
+    """Drop event folders this apply left empty, including ones just created."""
 
     for entry in directory.iterdir():
         if not entry.is_dir() or not is_cluster_folder_name(entry.name):
-            continue
-        if entry.resolve() in kept:
-            detail("event_folder_kept", name=entry.name, reason="still_used")
             continue
         try:
             entry.rmdir()
             detail("event_folder_removed", name=entry.name)
         except OSError:
-            detail("event_folder_kept", name=entry.name, reason="not_empty")
+            reason = "still_used" if entry.resolve() in kept else "not_empty"
+            detail("event_folder_kept", name=entry.name, reason=reason)
             continue
 
 trace_module(sys.modules[__name__])

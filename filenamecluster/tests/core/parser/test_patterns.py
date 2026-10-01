@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from filenamecluster.core.parser import PatternRule, TimestampPatterns, parse_timestamp
+from filenamecluster.core.parser.patterns import DEFAULT_RULES
 from filenamecluster.core.operations.pipeline import cluster_directory
 
 class PatternOptionTests(unittest.TestCase):
@@ -81,6 +82,15 @@ class PatternOptionTests(unittest.TestCase):
             date_only="",
         )
         self.assertIsNone(parse_timestamp("202401011015009999", patterns))
+
+    def test_an_unknown_field_is_refused_and_a_missing_rule_can_be_added(self):
+        with self.assertRaises(TypeError):
+            TimestampPatterns(not_a_rule="x")
+        key = DEFAULT_RULES[0].key
+        added = TimestampPatterns(rules=(), **{key: "(?P<ms>\\d{13})"})
+        self.assertEqual(getattr(added, key), "(?P<ms>\\d{13})")
+        with self.assertRaises(AttributeError):
+            added.not_a_field
 
     def test_an_extra_rule_is_used_alongside_the_built_in_ones(self):
         extra = PatternRule(
