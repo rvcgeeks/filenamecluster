@@ -26,6 +26,10 @@ def noted_name(directory: Path | str, cluster) -> str:
 
     note = _dominant_note(Path(directory), cluster)
     if note is None:
+        from filenamecluster.core.operations.model import load_folder_notes
+
+        note = load_folder_notes(directory).get(cluster.name)
+    if note is None:
         return cluster.name
     return name_with_note(note[0], cluster.name, note[1])
 

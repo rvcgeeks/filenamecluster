@@ -114,6 +114,7 @@ class AppView(ViewForwarding):
         root.title(self.translate("app_title"))
         root.geometry("1360x880")
         root.minsize(1040, 680)
+        root.protocol("WM_DELETE_WINDOW", self.close)
         self.kit.install_icon()
         self._build_header()
         self.status = ttk.Label(root, textvariable=self.status_text, style="Status.TLabel")

@@ -90,3 +90,90 @@ class SavedOptionsTests(unittest.TestCase):
             self.assertEqual(explicit.params.floor_hours, 3)
             self.assertEqual(load_model(folder).options.floor_hours, 3)
             self.assertEqual(load_model(folder).learned, explicit.model)
+
+
+class ChangedModelTests(unittest.TestCase):
+    def test_a_close_writes_only_the_side_that_changed(self):
+        from unittest.mock import patch
+
+        from filenamecluster.core.algorithm import GapModel, ModelOptions
+        from filenamecluster.core.operations import (
+            keep_folder_notes,
+            load_folder_notes,
+            load_model,
+            save_model,
+            store_if_changed,
+        )
+        from filenamecluster.core.operations.options import OptionReader
+        from filenamecluster.core.parser import TimestampPatterns
+
+        patterns = TimestampPatterns()
+        rules = tuple((rule.key, rule.description, rule.pattern) for rule in patterns.rules)
+        options = ModelOptions(3, 720, 1990, 2100, 30, 20, 10, rules)
+        learned = GapModel(1.5, 40, 8, True)
+        rows = [(key, key, description, pattern, False) for key, description, pattern in rules]
+        hours = {"floor": "3", "ceiling": "720"}
+        limits = {
+            "min_year": "1990",
+            "max_year": "2100",
+            "prec_clock": "30",
+            "prec_epoch": "20",
+            "prec_date": "10",
+        }
+        self.assertEqual(OptionReader().stored(hours, limits, rows), options)
+        with self.assertRaises(ValueError):
+            OptionReader().stored({**hours, "ceiling": "1"}, limits, rows)
+
+        with TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            self.assertFalse(store_if_changed(folder, None, None))
+            self.assertFalse((folder / "filenamecluster-model.json").exists())
+            save_model(folder, FolderModel(learned=learned, options=options))
+            path = folder / "filenamecluster-model.json"
+            before = path.read_bytes()
+            self.assertFalse(store_if_changed(folder, learned, options))
+            self.assertEqual(path.read_bytes(), before)
+
+            changed = ModelOptions(4, 720, 1990, 2100, 30, 20, 10, rules)
+            self.assertTrue(store_if_changed(folder, None, changed))
+            loaded = load_model(folder)
+            self.assertEqual(loaded.options.floor_hours, 4)
+            self.assertEqual(loaded.learned, learned)
+
+            other = GapModel(2, 40, 9, True)
+            self.assertTrue(store_if_changed(folder, other, None))
+            loaded = load_model(folder)
+            self.assertEqual(loaded.learned, other)
+            self.assertEqual(loaded.options.floor_hours, 4)
+
+            keep_folder_notes(folder, {rules[0][0]: ("Trip", "")})
+            self.assertEqual(load_folder_notes(folder), {rules[0][0]: ("Trip", "")})
+            save_model(folder, FolderModel(learned=other, options=changed))
+            self.assertEqual(load_folder_notes(folder), {rules[0][0]: ("Trip", "")})
+            keep_folder_notes(folder, {})
+            self.assertEqual(load_folder_notes(folder), {})
+
+            self.assertEqual(load_folder_notes(folder / "missing"), {})
+            path.write_text("[]", encoding="utf-8")
+            self.assertEqual(load_folder_notes(folder), {})
+            path.write_text("{", encoding="utf-8")
+            self.assertTrue(store_if_changed(folder, learned, options))
+            self.assertEqual(load_model(folder).learned, learned)
+            path.write_text(
+                json.dumps(
+                    {
+                        "notes": {
+                            "ok": "nope",
+                            "empty": {"prefix": "", "suffix": ""},
+                            "bad": {"prefix": 1, "suffix": "x"},
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(load_folder_notes(folder), {})
+
+            with patch("filenamecluster.core.operations.model.load_model", side_effect=OSError):
+                self.assertFalse(store_if_changed(folder, None, None))
+            with patch("filenamecluster.core.operations.model._write", side_effect=OSError):
+                keep_folder_notes(folder, {"stamp": ("Trip", "")})

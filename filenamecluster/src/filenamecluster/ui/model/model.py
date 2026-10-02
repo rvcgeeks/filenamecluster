@@ -25,6 +25,7 @@ from .display import (
     Topic,
     ValueProblemStatus,
 )
+from .notes import FolderNoteBook
 from .options import OptionFields
 from .patterns import PatternRow, PatternSnapshot
 from .preview_facts import PreviewFacts
@@ -47,6 +48,7 @@ class AppModel(PreviewFacts):
         self.logging_enabled = False
         self.busy = False
         self.cluster_sort: tuple[str, bool] | None = None
+        self.folder_notes = FolderNoteBook()
         self.apply_enabled = False
         self.flatten_enabled = False
         self._status = ChooseStatus()
@@ -172,8 +174,6 @@ class AppModel(PreviewFacts):
             return
 
     def add_custom(self, description: str) -> str:
-        """Append a blank custom rule and tell listeners to draw the table."""
-
         iid = f"custom-{self.custom_seq}"
         self.custom_seq += 1
         self._rows.append(PatternRow(iid, "", description, "", False))
@@ -186,8 +186,6 @@ class AppModel(PreviewFacts):
         self._notify(Topic.PATTERNS)
 
     def remember_preview(self, result: ClusterResult, invalid_rows: int = 0) -> None:
-        """Atomically replace the preview and every state derived from it."""
-
         self._result = result
         self._selected_cluster = None
         self._selected_day = result.clusters[0].start.date() if result.clusters else None
@@ -200,6 +198,7 @@ class AppModel(PreviewFacts):
         )
         self.apply_enabled = bool(result.clusters)
         self.flatten_enabled = event_folders > 0
+        self.folder_notes.seed(self._directory, result)
         self._status = SummaryStatus(
             events=len(result.clusters),
             files=result.file_count,
@@ -209,6 +208,10 @@ class AppModel(PreviewFacts):
             learned=self.learned_summary(),
             left_out=invalid_rows,
         )
+        self._notify(Topic.PREVIEW)
+
+    def replace_folder_note(self, stamp: str, prefix: str, suffix: str) -> None:
+        self.folder_notes.replace(stamp, prefix, suffix)
         self._notify(Topic.PREVIEW)
 
     def set_selection(self, cluster: int | None, day: date | None) -> None:

@@ -104,6 +104,15 @@ class FolderMissing:
 
 
 @dataclass(frozen=True, slots=True)
+class RenameRejected:
+    """A folder rename the window should explain. ``reason`` is invalid, exists, or failed."""
+
+    reason: str
+    name: str = ""
+    detail: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class ApplyCreate:
     path: Path
     files: int
@@ -136,6 +145,7 @@ Notice = (
     | CouldNotFlatten
     | FileMissing
     | FolderMissing
+    | RenameRejected
 )
 
 Question = ApplyCreate | ApplyUpdate | FlattenAsk

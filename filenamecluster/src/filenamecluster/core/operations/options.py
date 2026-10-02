@@ -9,8 +9,7 @@ from __future__ import annotations
 import sys
 from datetime import timedelta
 
-from filenamecluster.core.algorithm.cluster import ClusterParams
-from filenamecluster.core.algorithm import ModelOptions
+from filenamecluster.core.algorithm.cluster import ClusterParams, ModelOptions
 from filenamecluster.core.parser import LIMIT_FIELDS, PatternRule, TimestampPatterns
 from filenamecluster.log import trace_module
 from .errors import OptionError, OptionFault, OptionField
@@ -83,6 +82,39 @@ class OptionReader:
         except (OptionError, OverflowError, TypeError, ValueError):
             return False
         return True
+
+    def stored(
+        self,
+        hours: dict[str, str],
+        limits: dict[str, str],
+        rows: list[tuple],
+    ) -> ModelOptions:
+        """Options as the model file holds them, including a rule that does not compile.
+
+        Raises ``OptionError`` when a number cannot be read. A bad rule stays in
+        the list so closing the window does not drop it.
+        """
+
+        floor = self._number(OptionField.FLOOR, hours["floor"])
+        ceiling = self._number(OptionField.CEILING, hours["ceiling"])
+        parsed: dict[str, int] = {}
+        for key, _label, _hint, low, high in LIMIT_FIELDS:
+            parsed[key] = self._whole(_LIMIT_FIELDS[key], limits[key], low, high)
+        ClusterParams(floor=timedelta(hours=floor), ceiling=timedelta(hours=ceiling))
+        rules = tuple(
+            (str(key), str(description), str(pattern))
+            for _iid, key, description, pattern, *_rest in rows
+        )
+        return ModelOptions(
+            floor_hours=floor,
+            ceiling_hours=ceiling,
+            min_year=parsed["min_year"],
+            max_year=parsed["max_year"],
+            prec_clock=parsed["prec_clock"],
+            prec_epoch=parsed["prec_epoch"],
+            prec_date=parsed["prec_date"],
+            rules=rules,
+        )
 
     @staticmethod
     def _number(field: OptionField, raw: str) -> float:

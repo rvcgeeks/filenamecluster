@@ -14,12 +14,14 @@ from filenamecluster.log import event, trace_module
 from filenamecluster.ui.model import AppModel
 from .files import SystemFiles
 from .logging import SystemLogging
+from .folder_notes import FolderNotes
 from .opening import OpenActions
 from .pattern_edits import PatternEdits
 from .ports import DiskPort, LoggingPort, ViewPort
 from .previewing import FolderPreviewing
 from .relocation import FolderRelocation
 from .requests import Failure, Success, Wait
+from .session_store import SessionStore
 
 
 class AppController:
@@ -55,6 +57,8 @@ class AppController:
         )
         self._edits = PatternEdits(model, ui)
         self._opening = OpenActions(model, self._files, ui)
+        self._folder_notes = FolderNotes(model, ui)
+        self._session = SessionStore(model)
 
     def choose_folder(self) -> None:
         chosen = self.ui.choose_directory(Path.cwd() / "data")
@@ -185,6 +189,20 @@ class AppController:
 
     def open_cluster_folder(self, index: int) -> None:
         self._opening.open_cluster_folder(index)
+
+    def cluster_stamp(self, index: int) -> str:
+        return self._folder_notes.stamp(index)
+
+    def cluster_note(self, index: int) -> tuple[str, str]:
+        return self._folder_notes.note(index)
+
+    def rename_cluster_folder(self, index: int, prefix: str, suffix: str) -> None:
+        self._folder_notes.rename(index, prefix, suffix)
+
+    def store_on_close(self) -> None:
+        """Write options or the learned boundary when either differs from the file."""
+
+        self._session.store()
 
 
 trace_module(sys.modules[__name__])

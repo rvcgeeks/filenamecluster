@@ -30,6 +30,15 @@ class ViewForwarding:
 
     def flush_edits(self) -> None:
         self.patterns.flush_edits()
+        self.clusters.flush_rename()
+
+    def close(self) -> None:
+        """Store a changed model, then close the window."""
+
+        self.patterns.flush_edits()
+        self.clusters.folder_names.close(save=True)
+        self.actions.store_on_close()
+        self.root.destroy()
 
     def validate_pattern(self, iid: str) -> None:
         self.patterns.validate(iid)

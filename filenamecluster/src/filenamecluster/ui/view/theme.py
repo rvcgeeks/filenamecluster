@@ -222,6 +222,16 @@ def apply(root: tk.Misc) -> dict[str, tkfont.Font]:
     )
     style.configure("Path.TLabel", background=PANEL, foreground=MUTED)
     style.configure("Muted.TLabel", foreground=MUTED)
+    style.configure(
+        "ClusterStamp.TEntry",
+        foreground=MUTED,
+        fieldbackground=PANEL,
+    )
+    style.map(
+        "ClusterStamp.TEntry",
+        foreground=[("readonly", MUTED), ("disabled", MUTED)],
+        fieldbackground=[("readonly", PANEL)],
+    )
     style.configure("Info.TLabel", foreground=ACCENT_ACTIVE, font=fonts["bold"])
     style.configure("Status.TLabel", background=PANEL, foreground=TEXT, padding=(10, 4))
     style.configure("Error.TLabel", background=PANEL, foreground=ERROR, padding=(10, 4))

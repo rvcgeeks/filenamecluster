@@ -64,13 +64,14 @@ def save_model(directory: Path | str, model: FolderModel) -> Path:
     """Write the learned boundary and the options, and return that path."""
 
     path = model_path(directory)
-    _write(
-        path,
-        {
-            "learned": _learned_document(model.learned),
-            "options": _options_document(model.options),
-        },
-    )
+    document = {
+        "learned": _learned_document(model.learned),
+        "options": _options_document(model.options),
+    }
+    notes = _preserved_notes(path)
+    if notes:
+        document["notes"] = notes
+    _write(path, document)
     event("model_saved", path=str(path), learned=model.learned is not None, options=model.options is not None)
     return path
 
@@ -106,6 +107,94 @@ def keep_rules(directory: Path | str, rows: Sequence[tuple[str, str, str, bool]]
         event("model_save_failed", path=str(path))
         return
     event("invalid_rules_kept", path=str(path), rules=sum(1 for row in rows if row[3]))
+
+
+def load_folder_notes(directory: Path | str) -> dict[str, tuple[str, str]]:
+    """Words saved around event-folder stamps. An unreadable file is no notes."""
+
+    path = model_path(directory)
+    raw = _read_document(path)
+    notes = raw.get("notes") if isinstance(raw, dict) else None
+    if not isinstance(notes, dict):
+        return {}
+    loaded: dict[str, tuple[str, str]] = {}
+    for stamp, note in notes.items():
+        if not isinstance(stamp, str) or not isinstance(note, dict):
+            continue
+        prefix = note.get("prefix", "")
+        suffix = note.get("suffix", "")
+        if isinstance(prefix, str) and isinstance(suffix, str) and (prefix or suffix):
+            loaded[stamp] = (prefix, suffix)
+    return loaded
+
+
+def store_if_changed(
+    directory: Path | str,
+    learned: GapModel | None,
+    options: ModelOptions | None,
+) -> bool:
+    """Write the model when ``learned`` or ``options`` differs from the file.
+
+    ``None`` keeps that side as it is on disk. An unchanged file is left alone.
+    """
+
+    current = _current_model(directory)
+    next_learned = current.learned if learned is None else learned
+    next_options = current.options if options is None else options
+    if next_learned == current.learned and next_options == current.options:
+        return False
+    save_model(directory, FolderModel(next_learned, next_options))
+    return True
+
+
+def keep_folder_notes(directory: Path | str, notes: dict[str, tuple[str, str]]) -> None:
+    """Replace the saved words around event-folder stamps.
+
+    ``notes`` maps a stamp to ``(prefix, suffix)``. Empty sides are omitted.
+    A preview that rewrites the model keeps this object.
+    """
+
+    path = model_path(directory)
+    raw = _read_document(path)
+    stored = {
+        stamp: {"prefix": prefix, "suffix": suffix}
+        for stamp, (prefix, suffix) in notes.items()
+        if prefix or suffix
+    }
+    if stored:
+        raw["notes"] = stored
+    else:
+        raw.pop("notes", None)
+    try:
+        _write(path, raw)
+    except OSError:
+        event("model_save_failed", path=str(path))
+
+
+def _current_model(directory: Path | str) -> FolderModel:
+    path = model_path(directory)
+    if not path.is_file():
+        return FolderModel()
+    try:
+        return load_model(directory)
+    except (OSError, ValueError):
+        return FolderModel()
+
+
+def _preserved_notes(path: Path) -> dict | None:
+    raw = _read_document(path)
+    notes = raw.get("notes") if isinstance(raw, dict) else None
+    return notes if isinstance(notes, dict) and notes else None
+
+
+def _read_document(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
 
 
 def _write(path: Path, document: dict) -> None:

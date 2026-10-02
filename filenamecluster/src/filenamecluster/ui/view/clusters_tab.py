@@ -12,6 +12,7 @@ from tkinter import ttk
 
 from filenamecluster.log import trace_module
 from .calendar import CalendarView
+from .folder_name import FolderNameEditor
 from .timeline import TimelineView
 
 
@@ -70,6 +71,8 @@ class ClustersTab:
             )
         self.cluster_tree.bind("<<TreeviewSelect>>", self.on_selected)
         self.cluster_tree.bind("<Double-1>", self.on_opened)
+        self.folder_names = FolderNameEditor(self.host, self.cluster_tree)
+        self.folder_names.bind()
         panes.add(list_frame, weight=3)
 
         self.day_frame = self.kit.text(ttk.LabelFrame(panes, padding=8), "day_detail")
@@ -94,7 +97,11 @@ class ClustersTab:
         self.day_tree.bind("<Double-1>", self.on_day_file)
         panes.add(self.day_frame, weight=4)
 
+    def flush_rename(self) -> None:
+        self.folder_names.close(save=True)
+
     def show_clusters(self, clusters, days, order, sort, selected) -> None:
+        self.folder_names.close(save=False)
         self._suppress_select = True
         try:
             self.overview.show(clusters)

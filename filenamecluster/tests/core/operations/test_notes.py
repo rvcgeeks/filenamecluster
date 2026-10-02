@@ -132,3 +132,16 @@ class NoteTests(unittest.TestCase):
             self.assertEqual(noted_name(root, placed), cluster.name)
             plain.rename(root / "album")
             self.assertIsNone(find_event_folder(root, cluster))
+
+    def test_a_saved_note_is_used_when_no_folder_holds_the_files(self):
+        from filenamecluster.core.operations import keep_folder_notes
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            when = datetime(2024, 1, 1, 10, 0, 0)
+            cluster = name_clusters([Cluster((TimestampedFile("a.jpg", when),))])[0]
+            keep_folder_notes(root, {cluster.name: ("Hyderabad trip", "evening")})
+            self.assertEqual(
+                noted_name(root, cluster),
+                f"Hyderabad trip {cluster.name} evening",
+            )

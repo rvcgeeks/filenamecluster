@@ -22,6 +22,7 @@ from filenamecluster.ui.controller import (
     Flattened,
     FolderMissing,
     NothingToFlatten,
+    RenameRejected,
     NothingToMove,
     PatternBlank,
     PatternInvalid,
@@ -112,8 +113,21 @@ class Messages:
             self.tell_warning("file_missing_title", "file_missing_body", name=notice.name)
         elif isinstance(notice, FolderMissing):
             self.tell_warning("folder_missing_title", "folder_missing_body", name=notice.name)
+        elif isinstance(notice, RenameRejected):
+            self._rename_rejected(notice)
         else:
             raise TypeError(f"unknown notice {type(notice).__name__}")
+
+    def _rename_rejected(self, notice: RenameRejected) -> None:
+        if notice.reason == "exists":
+            body = self.host.translate("rename_exists_body", name=notice.name)
+            self.tell_error("rename_exists_title", body)
+            return
+        if notice.reason == "failed":
+            body = self.host.translate("rename_failed_body", detail=notice.detail)
+            self.tell_error("rename_failed_title", body)
+            return
+        self.tell_error("rename_invalid_title", self.host.translate("rename_invalid_body"))
 
     def question(self, asked) -> bool:
         if isinstance(asked, ApplyCreate):
