@@ -4,14 +4,6 @@ Rajas Chavadekar (rvchavadekar@gmail.com)
 
 This file records user-visible changes to File Name Cluster. Versions follow semantic versioning.
 
-## 0.1.54
-
-### Changed
-
-- The package version is now `0.1.54`.
-- The wait overlay closes before a confirmation, a name-clash question, or an OK prompt, so those questions are not covered by the spinner.
-- Apply and Flatten questions, and the OK prompts that follow them, show a countdown. The wait is the assignment `PROMPT_TIMEOUT_SECONDS = 30` in `filenamecluster/src/filenamecluster/ui/view/prompt.py`. `filenamecluster.ui.view` re-exports that name. Change that one assignment to change every one of those dialogs. The label reads “OK in {seconds}s” and ticks down from that number. When it reaches zero, the dialog continues as OK. Cancel, or closing the question, still stops the move. Closing an OK-only prompt is OK. The replace-or-skip question does not use this timer.
-
 ## 0.1.5
 
 ### Added
@@ -33,6 +25,9 @@ This file records user-visible changes to File Name Cluster. Versions follow sem
 - The Skipped tab no longer lists an event folder. A folder whose name contains the event dates, including extra words before or after those dates, stays out of that list. Its files are already in the events. The status line still counts those folders, and Flatten still offers to undo them. Other subfolders, and files with no capture time, still appear under Skipped. The About tab says this in every language.
 - The clustering core (`filenamecluster.core`) is required to stay at 100% test coverage. The rest of the suite stays at or above 80%.
 - A large folder does less repeated reading. The wait overlay stays up while the lists and timelines are drawn. Apply does not calculate the clusters again when the files and the options are unchanged since the last preview. Flatten lists the event folders and plans the moves in one pass, so there is no separate name-check wait before that move. A name the storage folder already has still asks replace or skip. The day view walks only that day’s files. A long Skipped list or day list is filled in batches.
+- The package version is now `0.1.5`.
+- The wait overlay closes before a confirmation, a name-clash question, or an OK prompt, so those questions are not covered by the spinner.
+- Apply and Flatten questions, and the OK prompts that follow them, show a countdown. The wait is the assignment `PROMPT_TIMEOUT_SECONDS = 30` in `filenamecluster/src/filenamecluster/ui/view/prompt.py`. `filenamecluster.ui.view` re-exports that name. Change that one assignment to change every one of those dialogs. The label reads “OK in {seconds}s” and ticks down from that number. When it reaches zero, the dialog continues as OK. Cancel, or closing the question, still stops the move. Closing an OK-only prompt is OK. The replace-or-skip question does not use this timer.
 
 ## 0.1.4
 
