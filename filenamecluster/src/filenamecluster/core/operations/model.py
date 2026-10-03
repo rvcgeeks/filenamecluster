@@ -187,20 +187,37 @@ def _preserved_notes(path: Path) -> dict | None:
     return notes if isinstance(notes, dict) and notes else None
 
 
+_DOCUMENT_CACHE: dict[Path, tuple[int, int, dict]] = {}
+
+
 def _read_document(path: Path) -> dict:
     if not path.is_file():
         return {}
     try:
+        info = path.stat()
+        key = path.resolve()
+    except OSError:
+        return {}
+    cached = _DOCUMENT_CACHE.get(key)
+    if cached is not None and cached[0] == info.st_mtime_ns and cached[1] == info.st_size:
+        return cached[2]
+    try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
-    return raw if isinstance(raw, dict) else {}
+    document = raw if isinstance(raw, dict) else {}
+    _DOCUMENT_CACHE[key] = (info.st_mtime_ns, info.st_size, document)
+    return document
 
 
 def _write(path: Path, document: dict) -> None:
     """The only place the model file is written."""
 
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    try:
+        _DOCUMENT_CACHE.pop(path.resolve(), None)
+    except OSError:
+        return
 
 
 def _learned(raw: object) -> GapModel | None:

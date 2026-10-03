@@ -23,7 +23,7 @@ class CatalogTests(unittest.TestCase):
         self.assertIn("CamScanner", t("about_regex_scan_body").format())
         self.assertIn("{path}", CATALOGS["en"]["about_logging_body"])
         self.assertNotEqual(t("apply", code="hi"), "Apply clustering")
-        self.assertEqual(t("choose_folder"), "Choose folder…")
+        self.assertEqual(t("choose_folder"), "Storage folder…")
 
     def test_the_status_line_describes_the_learned_boundary(self):
         none = LearnedSummary(LearnedKind.NONE)

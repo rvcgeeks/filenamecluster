@@ -42,6 +42,8 @@ class AppModel(PreviewFacts):
 
     def __init__(self) -> None:
         self._directory: Path | None = None
+        self._input: Path | None = None
+        self._shown = None
         self._result: ClusterResult | None = None
         self._selected_cluster: int | None = None
         self._selected_day: date | None = None
@@ -64,6 +66,17 @@ class AppModel(PreviewFacts):
     @property
     def directory(self) -> Path | None:
         return self._directory
+
+    @property
+    def input_directory(self) -> Path | None:
+        """Files are read from here. ``None`` means the storage folder."""
+
+        return self._input
+
+    def source_directory(self) -> Path | None:
+        """The folder whose loose files are clustered. Defaults to storage."""
+
+        return self._input or self._directory
 
     @property
     def result(self) -> ClusterResult | None:
@@ -104,6 +117,13 @@ class AppModel(PreviewFacts):
 
     def set_directory(self, path: Path) -> None:
         self._directory = Path(path)
+        self._input = _distinct_input(self._directory, self._input)
+        self._notify(Topic.FOLDER)
+
+    def set_input(self, path: Path | None) -> None:
+        """Read loose files from ``path``. ``None`` uses the storage folder."""
+
+        self._input = _distinct_input(self._directory, None if path is None else Path(path))
         self._notify(Topic.FOLDER)
 
     def reset_builtin(self) -> None:
@@ -192,6 +212,7 @@ class AppModel(PreviewFacts):
         self._notify(Topic.PATTERNS)
 
     def remember_preview(self, result: ClusterResult, invalid_rows: int = 0) -> None:
+        self._shown = None
         self._result = result
         self._selected_cluster = None
         self._selected_day = result.clusters[0].start.date() if result.clusters else None
@@ -218,6 +239,7 @@ class AppModel(PreviewFacts):
 
     def replace_folder_note(self, stamp: str, prefix: str, suffix: str) -> None:
         self.folder_notes.replace(stamp, prefix, suffix)
+        self._shown = None
         self._notify(Topic.PREVIEW)
 
     def set_selection(self, cluster: int | None, day: date | None) -> None:
@@ -291,6 +313,20 @@ class AppModel(PreviewFacts):
     def _notify(self, topic: Topic) -> None:
         for callback in list(self._listeners):
             callback(topic)
+
+
+def _distinct_input(storage: Path | None, incoming: Path | None) -> Path | None:
+    """Drop an input path that is the storage folder. Storage remains the default."""
+
+    if storage is None or incoming is None:
+        return incoming
+    try:
+        if incoming.resolve() == storage.resolve():
+            return None
+    except OSError:
+        if incoming == storage:
+            return None
+    return incoming
 
 
 trace_module(sys.modules[__name__])

@@ -20,6 +20,8 @@ from filenamecluster.core import (
     OptionReader,
     SavedOptionsState,
     ScanState,
+    folder_fingerprint,
+    option_signature,
 )
 from filenamecluster.log import event, trace_module
 from .ports import DiskPort
@@ -41,9 +43,10 @@ class FolderPreviewing:
         self.model.set_directory(Path(folder))
         event("folder_chosen", path=str(self.model.directory))
         directory = self.model.directory
-        self.disk(Wait.OPEN, lambda: self._preview.scan(directory), self._finish_folder_load)
+        source = self._source()
+        self.disk(Wait.OPEN, lambda: self._preview.scan(directory, source), self._finish_folder_load)
 
-    def refresh(self, on_ready=None, wait: Wait = Wait.PREVIEW) -> None:
+    def refresh(self, on_ready=None, wait: Wait = Wait.PREVIEW, reuse: bool = False) -> None:
         """Re-scan the folder. ``on_ready`` receives True when a preview is stored."""
 
         def report(ok: bool) -> None:
@@ -72,11 +75,14 @@ class FolderPreviewing:
             report(False)
             return
         directory = self.model.directory
+        source = self._source()
 
         def work():
-            return self._preview.current(directory, prepared)
+            if reuse and self._unchanged(directory, source, prepared):
+                return None
+            return self._preview.current(directory, prepared, source)
 
-        def on_done(outcome: Success[CurrentPreview] | Failure) -> None:
+        def on_done(outcome: Success[CurrentPreview | None] | Failure) -> None:
             if isinstance(outcome, Failure):
                 error = outcome.error
                 if isinstance(error, OSError):
@@ -85,6 +91,9 @@ class FolderPreviewing:
                     report(False)
                     return
                 raise error
+            if outcome.value is None:
+                report(True)
+                return
             preview = outcome.value
             self._store_preview(preview.result, len(preview.invalid))
             event(
@@ -128,6 +137,19 @@ class FolderPreviewing:
             events=len(result.clusters),
             files=result.file_count,
         )
+
+    def _source(self) -> Path | None:
+        if self.model.input_directory is None:
+            return None
+        return self.model.source_directory()
+
+    def _unchanged(self, directory: Path, source: Path | None, prepared) -> bool:
+        result = self.model.result
+        if result is None or not result.signature:
+            return False
+        if option_signature(prepared.params, prepared.patterns) != result.signature:
+            return False
+        return folder_fingerprint(directory, source) == result.fingerprint
 
     def _store_preview(self, result, invalid: int) -> None:
         self.model.remember_preview(result, invalid)

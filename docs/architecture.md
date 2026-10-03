@@ -6,9 +6,9 @@ The mathematics of the boundary is in [algorithm.md](algorithm.md). This file is
 
 ## High-level design
 
-File Name Cluster is a desktop app. A person picks one folder. The app reads capture times from filenames and, when a name has none, from recognised picture, video, or PDF metadata. It learns one event boundary for that folder, draws the events, and, on confirmation, moves files into one folder per event. A later batch dropped into the same folder is clustered together with the files already filed.
+File Name Cluster is a desktop app. A person picks a storage folder. That folder is required: event folders and `filenamecluster-model.json` are created there. An input folder is optional. When it is not set, files are read from the storage folder. When it is a different path, loose files and files already inside event folders are read from both folders and clustered as one series. The app reads capture times from filenames and, when a name has none, from recognised picture, video, or PDF metadata. It learns one event boundary for the storage folder, draws the events, and, on confirmation, moves files into one folder per event under storage. Flatten returns those files to the storage folder, not to the input folder. A later batch dropped into storage, or into the input folder, is clustered together with the files already filed.
 
-When a filename has no capture time, only that time is read from the picture or video container, or from PDF CreationDate metadata; pixels, GPS, camera details, document contents, and filesystem dates are not read. Unsupported files and files with unreadable capture times are skipped. The model file `filenamecluster-model.json` sits in the chosen folder, visible. It stores the last fitted boundary at full precision under `learned`, and the safety limits, year window, priorities, and filename patterns last used for that folder under `options`. `core/operations/model.py` writes both keys whenever it writes the file. Fitting and reusing the boundary reads only `learned`.
+When a filename has no capture time, only that time is read from the picture or video container, or from PDF CreationDate metadata; pixels, GPS, camera details, document contents, and filesystem dates are not read. Unsupported files and files with unreadable capture times are skipped. The model file `filenamecluster-model.json` sits in the storage folder, visible. It stores the last fitted boundary at full precision under `learned`, and the safety limits, year window, priorities, and filename patterns last used for that folder under `options`. `core/operations/model.py` writes both keys whenever it writes the file, and it caches a document by path, size, and modification time until the next write. Fitting and reusing the boundary reads only `learned`.
 
 ```mermaid
 flowchart LR
@@ -17,7 +17,8 @@ flowchart LR
     pipe --> parser["core.parser"]
     pipe --> exif["core.exif"]
     pipe --> algo["core.algorithm"]
-    parser --> folder["Chosen folder"]
+    parser --> folder["Storage folder"]
+    parser --> incoming["Input folder, when different"]
     pipe --> folder
     ui --> views["Timeline, calendar, day detail"]
 ```
@@ -52,11 +53,12 @@ flowchart TB
         modelfile["load_model / save_model"]
     end
 
-    subgraph storage["Folder on disk"]
+    subgraph storage["Storage folder on disk"]
         loose["Loose files"]
         events["Event folders"]
         json["filenamecluster-model.json"]
         other["Other subfolders, not entered"]
+        incoming["Input folder, when different"]
     end
 
     app --> timeline
@@ -76,6 +78,7 @@ flowchart TB
     parse --> loose
     parse --> events
     parse --> other
+    parse --> incoming
     modelfile --> json
     move --> events
     flatten --> loose
@@ -84,7 +87,7 @@ flowchart TB
 | Component | Owns | Does not own |
 |---|---|---|
 | `ui` | Window, options, drawing, confirmation | The decision of where an event boundary is |
-| `operations` | `pipeline.py` turns one folder into a `ClusterResult`. `model.py` is the only writer of the JSON. `organize.py` names folders, moves files, and finds a file or an event folder on disk. `notes.py` keeps words added around an event-folder stamp. `options.py` reads option text. `preview.py` scans with saved options. `ledger.py` marks invalid rules through `model.py` | The fit |
+| `operations` | `pipeline.py` turns the storage folder, and an optional input folder, into a `ClusterResult`. `model.py` is the only writer of the JSON. `organize.py` names folders, moves files, and finds a file or an event folder on disk. `placement.py` plans those moves, including `survey_flatten`, which lists event folders and plans Flatten in one pass. `notes.py` keeps words added around an event-folder stamp. `options.py` reads option text. `preview.py` scans with saved options. `ledger.py` marks invalid rules through `model.py` | The fit |
 | `parser` | Filename clocks and the year window in `patterns.py`; the folder listing in `scan.py` | Clustering |
 | `algorithm` | `cluster.py` orders the gaps. `fit.py` fits the mixture and the boundary $\tau$. `split.py` decides each pause | Tk, moving files, the JSON file |
 | `exif` | Capture time stored in a picture, video, or PDF. `read.py` chooses the container; `image.py`, `video.py`, `pdf.py`, and `tiff.py` read it. A file with no readable time is skipped | Filenames, clustering |
@@ -116,6 +119,7 @@ classDiagram
         +name: str
         +timestamp: datetime
         +source: str
+        +origin: str
     }
     class FolderContents {
         +files
@@ -167,12 +171,16 @@ classDiagram
         +ignored_directories
         +params
         +model
+        +fingerprint
+        +signature
         +file_count
     }
     class FileNameClusterApp {
         +directory
         +result
         +refresh()
+        +choose_input()
+        +clear_input()
         +apply_clustering()
         +flatten_clustering()
     }
@@ -206,7 +214,7 @@ classDiagram
 
 `NamedCluster` is not a subclass in code. It carries the same files plus the folder name. The diagram shows that as an extension of the data, not as inheritance.
 
-`TimestampedFile.source` is empty when the file sits directly in the chosen folder. When the file already lives in an event folder, `source` is `event-folder/filename` and `name` stays the filename.
+`TimestampedFile.source` is empty when the file sits directly in the folder it was read from. When the file already lives in an event folder, `source` is `event-folder/filename` and `name` stays the filename. `origin` is empty for a file read from storage. It is `input` for a file read from a different input folder. The destination of a move is always under storage. `ClusterResult.fingerprint` is the `(origin, relative path, size, modification time)` of every media file that scan read. `ClusterResult.signature` is the option values used for that preview. Apply compares both with the folder as it is now and skips a fresh clustering when they match.
 
 ## Low-level design
 
@@ -224,11 +232,15 @@ sequenceDiagram
     participant Fit as cluster
     participant Learn as fit
 
-    App->>Pipe: directory, params, patterns
-    Pipe->>Model: load_model
+    App->>Pipe: storage folder, optional input folder, params, patterns
+    Pipe->>Model: load_model, once for this open
     Model-->>Pipe: FolderModel or empty
-    Pipe->>Scan: chosen folder
+    Pipe->>Scan: storage folder
     Scan-->>Pipe: loose files, other folders, files inside event folders
+    opt input folder is a different path
+        Pipe->>Scan: input folder
+        Scan-->>Pipe: the same kinds of names, marked origin input
+    end
     loop each filename
         Pipe->>Parse: name, compiled patterns
         Parse-->>Pipe: timestamp or none
@@ -251,11 +263,11 @@ Inside `parse_timestamp`, every enabled rule is tried. A match produces a candid
 
 If filename parsing returns no timestamp, `core.exif` first checks the container signature. Recognised still images are JPEG, PNG, WebP, TIFF, and HEIF/AVIF. Recognised videos are MP4, MOV, M4V, 3GP, and AVI. An embedded EXIF `DateTimeOriginal` is preferred; a video can otherwise use its `mvhd` or `IDIT` creation time. A recognised PDF uses its Info-dictionary `CreationDate` or XMP `CreateDate`. Reads are bounded to the PDF head and tail. The reader is standard-library-only and never deep-scans an arbitrary file. Failure returns `None`, and `pipeline` records that file in `ignored_without_timestamp`.
 
-`scan_directory` lists the chosen folder only one level down. A subdirectory whose name matches an event folder is opened, and only its immediate files are taken. The match allows words before the stamp, after it, or both, such as `Hyderabad trip 4 14-11-2015 16.48.30 to 15-11-2015 13.31.11` or `4 14-11-2015 16.48.30 to 15-11-2015 13.31.11 Hyderabad Trip`. Those words are a note. A space separates the note from the stamp. Text glued to the stamp is not an event folder. The dates inside the stamp are not parsed into times. Any other subdirectory is recorded and not entered. `filenamecluster-model.json` is never treated as media.
+`scan_directory` lists one folder only one level down. The storage folder is always listed. A different input folder is listed the same way. A subdirectory whose name matches an event folder is opened, and only its immediate files are taken. The match allows words before the stamp, after it, or both, such as `Hyderabad trip 4 14-11-2015 16.48.30 to 15-11-2015 13.31.11` or `4 14-11-2015 16.48.30 to 15-11-2015 13.31.11 Hyderabad Trip`. Those words are a note. A space separates the note from the stamp. Text glued to the stamp is not an event folder. The dates inside the stamp are not parsed into times. Any other subdirectory is recorded and not entered. `filenamecluster-model.json` is never treated as media.
 
 ### Apply
 
-Apply calls refresh first, so the confirmation dialog describes the clustering of the folder as it is now, including any files copied in since the last preview. That read runs under `SpinnerDialog` before the question is shown. After you confirm, filenames already in the destination are planned under `busy_name_check`. Each one opens `NameClashDialog`: replace that file, skip it, or, when more than one name clashes, do that for all of them. Closing the dialog moves nothing. A `SpinnerDialog` then stays up while `move_into_cluster_folders` runs. Both waits go through `AppController._run_disk`: a daemon thread named `filenamecluster-disk`, polled with `root.after` from the normal event loop, so the operating system does not treat the app as frozen. `AppView.lock_inputs` disables every button, spinbox, checkbox, and language menu, and ignores pattern-cell edits, for that time. The timeline, calendar, and lists stay usable. When a wait finishes, the dialog closes and the controls return to their previous states. The confirmation sits between the two spinners. The done or error dialog follows the move.
+Apply calls refresh first, so the confirmation dialog describes the clustering of the folders as they are now, including any files copied in since the last preview. That check runs under `SpinnerDialog` before the question is shown. When the stored fingerprint and option signature still match, the disk thread returns the preview already on screen and does not call `cluster_directory`. A changed file, a changed option, or a changed input folder still recalculates. After you confirm, filenames already in the destination are planned under `busy_name_check`. Each one opens `NameClashDialog`: replace that file, skip it, or, when more than one name clashes, do that for all of them. Closing the dialog moves nothing. A `SpinnerDialog` then stays up while `move_into_cluster_folders` runs. A file whose `origin` is `input` is moved from the input folder into an event folder under storage. Both waits go through `AppController._run_disk`: a daemon thread named `filenamecluster-disk`, polled with `root.after` from the normal event loop, so the operating system does not treat the app as frozen. `DiskRunner` delivers the result and then closes the spinner, so the overlay stays up while the window paints. `AppController` clears the busy flag before that paint, so a following disk job can start. `AppView.lock_inputs` disables every button, spinbox, checkbox, and language menu, and ignores pattern-cell edits, for that time. The timeline, calendar, and lists stay usable. When a wait finishes, the controls return to their previous states. The confirmation sits between the two spinners. The done or error dialog follows the move.
 
 Each wait passes its own message key, so the overlay says why it is up:
 
@@ -263,10 +275,10 @@ Each wait passes its own message key, so the overlay says why it is up:
 | --- | --- | --- |
 | `busy_open` | After a folder is chosen: saved options are read and every file is dated | Yes |
 | `busy_preview` | Update preview, Enter in an option, Restore defaults | Yes |
-| `busy_apply_check` | Apply clicked, before the question | Yes |
-| `busy_apply` | Apply confirmed, files move into event folders | No |
-| `busy_name_check` | After Apply or Flatten is confirmed, before the move: filenames the destination already has | No |
-| `busy_flatten_check` | Flatten clicked, event folders are listed before the question | No |
+| `busy_apply_check` | Apply clicked, before the question. Recalculates unless the files and the options match the preview already on screen | Yes, unless unchanged |
+| `busy_apply` | Apply confirmed, files move into event folders under storage | No |
+| `busy_name_check` | After Apply is confirmed, before the move: filenames the destination already has. Flatten does not use this wait | No |
+| `busy_flatten_check` | Flatten clicked. Event folders are listed and the moves are planned before the question. No clusters are calculated | No |
 | `busy_flatten` | Flatten confirmed, files move back | No |
 | `busy_after_flatten` | After a flatten, for the new preview | Yes |
 | `busy_after_error` | After a move fails, to show what is on disk | Yes |
@@ -314,16 +326,16 @@ The leading number is the chronological index starting at 1, unpadded. The clock
 
 ### Flatten
 
-Flatten uses the same spinners as Apply. The first plays while the event folders are listed, before the confirmation that files will move back. When a folder name has extra words, that confirmation warns that flattening removes those words with the folder. Apply keeps them. After you confirm, the names are planned. Each filename the chosen folder already has is a `NameClash`: the view asks whether to replace the file in the destination or skip it, and, when more than one name clashes, whether to do that for all of them. Closing that dialog cancels the move, and nothing has been moved yet. The move itself then runs under the spinner. `flatten_cluster_folders` considers only immediate subfolders whose names match that pattern, including a name that has a note. A skipped file stays in its event folder, so `rmdir` leaves that folder on disk. A nested directory left inside an event folder does the same. Other subfolders are not touched. The model JSON stays, because it is not inside an event folder.
+Flatten uses the same spinner as Apply for the move. The first spinner plays while `survey_flatten` lists the event folders and builds the `PlacementPlan` in one pass, before the confirmation that files will move back to the storage folder. When a folder name has extra words, that confirmation warns that flattening removes those words with the folder. Apply keeps them. After you confirm, that plan is reused. There is no second listing and no `busy_name_check` spinner. Each filename the storage folder already has is a `NameClash`: the view asks whether to replace the file in the destination or skip it, and, when more than one name clashes, whether to do that for all of them. Closing that dialog cancels the move, and nothing has been moved yet. The move itself then runs under the spinner. `flatten_cluster_folders` considers only immediate subfolders of storage whose names match that pattern, including a name that has a note. A skipped file stays in its event folder, so `rmdir` leaves that folder on disk. A nested directory left inside an event folder does the same. Other subfolders are not touched. Files are not sent back to the input folder. The model JSON stays, because it is not inside an event folder.
 
 ### A later batch
 
-Copying files into the chosen folder does not start a background watcher. The next `refresh` (Choose folder, Update preview, or the refresh at the start of Apply) rebuilds one sequence:
+Copying files into the storage folder, or into the input folder, does not start a background watcher. The next `refresh` (**Storage folder…**, **Input folder…**, **Read files from storage**, Update preview, or the refresh at the start of Apply) rebuilds one sequence:
 
-1. Loose timestamped files in the chosen folder.
-2. Timestamped files already inside event folders.
+1. Loose timestamped files in the storage folder, and in the input folder when that path is different.
+2. Timestamped files already inside event folders under either folder.
 
-That sequence is fitted again. A new file joins an event when its neighbouring gaps do not split. It starts an event when they do. Apply then moves only the files whose current path is not already the destination, and drops event folders that became empty because their span, and therefore their name, changed. When the old folder name has a note — words before the stamp, after it, or both — the new folder keeps those words around the updated stamp, including when the dates or the leading number change. A loose file in the album has no note and does not vote. The note that is kept is the one on the event folder that already holds the most of that event’s files. When two notes are on the same number of files, the note on the earlier files stays. If one noted folder splits into two events, each new folder receives that same note. The cluster list shows those words around the stamp. It reads the event folders in the chosen folder once and matches each event to that list, so Choose folder leaves the spinner when the scan finishes. Right-click a Folder name to edit the words before it and the words after it. The stamp in the middle stays read-only, including after the app opens again. The folder on disk keeps the words, and double-click opens that folder. Closing the window writes the options or the learned boundary when either differs from the model file. A value that cannot be read does not replace what is already stored. When the destination already has that filename — a loose copy beside the event folders, or a loose file in the way of Flatten — the move stops for a `NameClash` question instead of failing the whole operation. Replace overwrites the destination. Skip leaves both files where they are. The same question is used for Apply and Flatten. `ClashResolver` walks the clashes, `NameClashDialog` writes the choice, and core places the files.
+That sequence is fitted again. A new file joins an event when its neighbouring gaps do not split. It starts an event when they do. Apply then moves only the files whose current path is not already the destination, and drops event folders that became empty because their span, and therefore their name, changed. When the old folder name has a note — words before the stamp, after it, or both — the new folder keeps those words around the updated stamp, including when the dates or the leading number change. A loose file in the album has no note and does not vote. The note that is kept is the one on the event folder that already holds the most of that event’s files. When two notes are on the same number of files, the note on the earlier files stays. If one noted folder splits into two events, each new folder receives that same note. The cluster list shows those words around the stamp. It reads the event-folder names already collected by the scan and matches each event to that list, so **Storage folder…** leaves the spinner when the scan finishes and the window has been painted. Right-click a Folder name to edit the words before it and the words after it. The stamp in the middle stays read-only, including after the app opens again. The folder on disk keeps the words, and double-click opens that folder. Closing the window writes the options or the learned boundary when either differs from the model file. A value that cannot be read does not replace what is already stored. When the destination already has that filename — a loose copy beside the event folders, or a loose file in the way of Flatten — the move stops for a `NameClash` question instead of failing the whole operation. Replace overwrites the destination. Skip leaves both files where they are. The same question is used for Apply and Flatten. `ClashResolver` walks the clashes, `NameClashDialog` writes the choice, and core places the files.
 
 ## Descriptive write-up
 
@@ -333,9 +345,9 @@ The package splits along the three jobs the work actually has.
 
 **Decide the events.** `fit` in `core/algorithm/fit.py` is a pure function from a list of log-hours to a `GapModel` or `None`. `core/operations/model.py` reads and writes `filenamecluster-model.json`. `cluster` wraps the fit with the floor, the ceiling, the 36-hour fallback, and the reuse of a saved boundary. The fit does not import Tk or touch the filesystem, so the same function can cluster a camera roll held only in memory.
 
-**Put the events on disk and on screen.** `organize` knows the folder-name grammar and the move rules. `pipeline` is the one function the window calls to go from a path to a `ClusterResult`, and it is also the function that writes the JSON. `ui` draws that result and asks before `organize` moves anything. Reading a chosen folder, preparing that question, and moving the files each run off the UI thread, with `spinner.gif` on screen, so a large folder does not look frozen.
+**Put the events on disk and on screen.** `organize` knows the folder-name grammar and the move rules. `pipeline` is the one function the window calls to go from a path to a `ClusterResult`, and it is also the function that writes the JSON. `ui` draws that result and asks before `organize` moves anything. Reading the storage folder and any different input folder, preparing that question, and moving the files each run off the UI thread, with `spinner.gif` on screen, so a large folder does not look frozen. The day timeline receives one event per original cluster, with only that day's files, so it does not walk the other days. `WidgetKit.fill_tree` inserts a Skipped list or a day list in one step when it has 400 rows or fewer, and inserts the rest on later turns of the event loop when it is longer. `PreviewFacts.shown` keeps one copy of the draw values until the preview changes. `core/exif/read.py` caches a capture time, including a miss, by path, size, modification time, and year window.
 
-The window follows classic MVC. `core` scans, clusters, persists, and moves files without importing `ui`. `AppModel` in `ui/model/model.py` is the single observable application model: chosen folder, authoritative option drafts, pattern rows, preview, selection, status facts, action availability, language, logging, sort, and busy state. `AppView.attach` stores the model and subscribes. `AppView.build` creates the widgets, and `AppView.draw` paints once through `ui/view/render.py`; drawing does not write back. The option rows come from `OptionFields`, so `build` takes no field lists. Callers receive copies of option drafts and pattern rows. Observer topics are the `Topic` enum, and `render.py` handles every topic, including a draft change that does not repaint. Typed values in `ui/model/display.py` carry skipped reasons, learned-boundary facts, calendar days, and separate frozen status variants (`ChooseStatus`, `SummaryStatus`, `OptionProblemStatus`, `ValueProblemStatus`, `ReadFailureStatus`, `PreviewStaysStatus`) without exposing core objects to widgets. `OptionFields` holds the built-in safety-limit rows. `PatternRow` is one filename rule, and `rule_error` in `core/operations` decides whether its expression compiles. `PreviewFacts` produces neutral skipped and learned projections.
+The window follows classic MVC. `core` scans, clusters, persists, and moves files without importing `ui`. `AppModel` in `ui/model/model.py` is the single observable application model: storage folder, optional input folder, authoritative option drafts, pattern rows, preview, selection, status facts, action availability, language, logging, sort, and busy state. An input path that resolves to the storage folder is stored as no separate input. `AppView.attach` stores the model and subscribes. `AppView.build` creates the widgets, and `AppView.draw` paints once through `ui/view/render.py`; drawing does not write back. The option rows come from `OptionFields`, so `build` takes no field lists. Callers receive copies of option drafts and pattern rows. Observer topics are the `Topic` enum, and `render.py` handles every topic, including a draft change that does not repaint. Typed values in `ui/model/display.py` carry skipped reasons, learned-boundary facts, calendar days, and separate frozen status variants (`ChooseStatus`, `SummaryStatus`, `OptionProblemStatus`, `ValueProblemStatus`, `ReadFailureStatus`, `PreviewStaysStatus`) without exposing core objects to widgets. `OptionFields` holds the built-in safety-limit rows. `PatternRow` is one filename rule, and `rule_error` in `core/operations` decides whether its expression compiles. `PreviewFacts` produces neutral skipped and learned projections.
 
 `FolderPreview` in `core/operations/preview.py` prepares current drafts, clusters the folder, and records invalid rules as one UI-free operation. A pattern row is `(iid, key, description, pattern, dirty)`; core uses the explicit key and does not infer it from the row id. `FolderPreview.scan` returns a `FolderScan` with `ScanState` and `SavedOptionsState`. `FolderPreviewing` in `ui/controller/previewing.py` dispatches that operation and records its result on `AppModel`. `FolderRelocation` confirms Apply and Flatten and asks core to move the files. `AppController` turns gestures into core calls and model transitions; it neither names widgets nor draws. It sends frozen dialog payloads and `Wait` values. The view maps those to the existing catalog. `AppController._run_disk` delivers `Success` or `Failure`. The controller opens files with `SystemFiles` and applies the logging switch with `SystemLogging`. `FileNameClusterApp` constructs that controller from the model and the view. A test may replace `AppView.run_work` first; folder work then uses that callable instead of the spinner. Option failures are `OptionFault` and `OptionField` values. The view maps them to catalog sentences. `DialogPort`, `FolderPickerPort`, `TaskRunnerPort`, and `DiskPort` make its external needs explicit. `DiskRunner` owns only the spinner, thread, and result delivery. `AppModel.busy` is the one input-lock state, and its notification makes the view lock or unlock controls.
 
@@ -373,10 +385,13 @@ Every control on the window, the module that builds it, and the function that ru
 | Window, 1360×880, minimum 1040×680 | `AppView.build` | `tk.Tk` created in `main`; `root.mainloop` |
 | Window icon | `AppView._install_icon` | `tk.PhotoImage` of `ui/assets/icon.png` from `_icon_path` |
 | Title bar text and the large title | `AppView.build`, `AppView._build_header` | Catalog key `app_title`. `retranslate` sets `root.title` again |
-| Folder path under the title | `AppView._build_header` label bound to `folder_text` | `AppController.load_folder` writes the path. With no folder, `retranslate` writes the empty-state phrase |
+| Storage path under the title | `AppView._build_header` label bound to `folder_text` | `AppController.load_folder` writes the path. With no folder, `retranslate` writes “No storage folder chosen” |
+| Input path under the title | `AppView._build_header` label bound to `input_text` | “Input: same as storage”, or “Input: ” plus the other path. `AppView.set_folder` writes it |
 | Language label | `AppView._build_header` | Label only |
 | Language menu | `AppView._build_header` combobox bound to `language_var` | `<<ComboboxSelected>>` → `AppView._on_language` → `AppController.language_chosen` → `AppModel.set_language` → `AppView.retranslate`. `i18n.t` receives that code explicitly |
-| Choose folder… | `AppView._build_header` | `AppController.choose_folder` → `tkinter.filedialog.askdirectory`. After a folder is chosen, `load_folder` plays the spinner and runs `_preview_saved_folder` on the background thread |
+| Storage folder… | `AppView._build_header` | `AppController.choose_folder` → `tkinter.filedialog.askdirectory`, titled “Choose the storage folder”. After a folder is chosen, `load_folder` plays the spinner and runs the folder scan on the background thread |
+| Input folder… | `AppView._build_header` | `AppController.choose_input`. With no storage folder, the window says a storage folder is required. Otherwise the picker is titled “Choose the input folder”, `AppModel.set_input` stores a different path, and the preview runs again |
+| Read files from storage | `AppView._build_header` | `AppController.clear_input`. Drops a separate input folder and reads from storage again. Does nothing when input is already the storage folder |
 | Flatten clustering | `AppView._build_header` | Starts disabled. `AppController.flatten_clustering` shows the spinner, then `_confirm_flatten` asks, then plans names. A name the folder already has opens the replace-or-skip dialog. The spinner then plays again for the move |
 | Apply clustering | `AppView._build_header` | Starts disabled. `AppController.apply_clustering` shows the spinner, then `_confirm_apply` asks, then plans names. A name the destination already has opens the replace-or-skip dialog. The spinner then plays again for the move |
 | Status line along the bottom | `AppView.build` label bound to `status_text` | `AppModel.status` stores semantic facts; `Messages.paint_status` translates and draws them. A language change draws them again |
@@ -480,14 +495,16 @@ Choosing a folder calls `_preview_saved_folder` on the background thread. That l
 
 | What you see | Opened by | What runs next |
 | --- | --- | --- |
-| Choose the folder to cluster | `AppController.choose_folder` | After a folder is chosen, the spinner plays while `load_folder` reads it |
+| Choose the storage folder | `AppController.choose_folder` | After a folder is chosen, the spinner plays while `load_folder` reads it |
+| Choose the input folder | `AppController.choose_input` | After a different folder is chosen, the spinner plays while both folders are read |
+| Storage folder required | `AppController.choose_input` when no storage folder is set | Dialog only. Event folders are created in the storage folder |
 | Apply confirmation | `AppController._confirm_apply` | Shown after the reading spinner. Yes → plan the moves, then `NameClashDialog` for each filename the destination already has, then a `SpinnerDialog` and `move_into_cluster_folders`. No, or closing a clash dialog → nothing is moved |
 | Nothing to move | `apply_clustering` when there are no events | Dialog only |
 | Could not move | `apply_clustering` on `OSError` or `ValueError` | Then `refresh` |
 | Applied | `apply_clustering` after a successful move | Apply is disabled. Flatten is enabled. The drawings stay |
 | Wait overlay, with `spinner.gif` | `ui.view.spinner.SpinnerDialog`, opened by `DiskRunner` from `AppController._run_disk` | On macOS an `overlay` window with a `systemTransparent` background, so there is no black box and no title bar. Windows uses `-transparentcolor`. Linux uses `overrideredirect` and the plain background. Large bold text from the `busy_*` key passed to `_run_disk`. Frame delays come from `gif_delays`. It does not grab the rest of the window |
 | Buttons, spinboxes, the logging switch, and the language menu | `AppView.lock_inputs` | Disabled while the spinner is up. Pattern cells ignore double-click. `AppView.unlock_inputs` restores the earlier state, including a button that was already disabled |
-| Flatten confirmation | `AppController._confirm_flatten` | Shown after the reading spinner. When a folder name has extra words, the question warns that those words are removed with the folder. Yes → plan the moves, then the same replace-or-skip dialog, then a `SpinnerDialog` and `flatten_cluster_folders` |
+| Flatten confirmation | `AppController._confirm_flatten` | Shown after `survey_flatten` has listed the event folders and planned the moves. When a folder name has extra words, the question warns that those words are removed with the folder. Yes → the same replace-or-skip dialog, then a `SpinnerDialog` and `flatten_cluster_folders` with that plan. Files return to the storage folder |
 | Nothing to flatten | `flatten_clustering` when no event folder is present | Dialog only |
 | Could not flatten | `flatten_clustering` on `OSError` or `ValueError` | Then `refresh` |
 | Folder has not been created | `AppController.open_cluster_folder` when `organize.event_folder` finds no directory | `ui.controller.files.open_folder_window` when it does |
@@ -510,7 +527,8 @@ Choosing a folder calls `_preview_saved_folder` on the background thread. That l
 
 | What you see | What it means | What to try | Where it lives |
 | --- | --- | --- | --- |
-| The status line says to choose a folder, and Apply stays disabled | No folder is loaded, so `refresh` returns without scanning | Choose folder… | `AppController.refresh`, `choose_folder` |
+| The status line says to choose a storage folder, and Apply stays disabled | No storage folder is loaded, so `refresh` returns without scanning | Storage folder… | `AppController.refresh`, `choose_folder` |
+| Input folder… says a storage folder is required | Event folders have nowhere to be created yet | Storage folder… first. Input is optional and defaults to that folder | `AppController.choose_input`, `StorageRequired` |
 | A pattern row is orange, and the status line says invalid filename patterns were left out | That recipe does not compile | Fix the recipe, or clear it to turn the row off. The other rows still scan, and the row is saved marked `invalid` | `rule_error`, `OptionReader`, `RuleLedger`, `FolderPreviewing.refresh` |
 | Update preview does not change the drawings, and the status line names a pattern row | The recipe compiles, but its named groups are not one of the four kinds | Fix the named groups. The previous preview is kept | `OptionReader`, `core.parser` compile, `AppController.refresh` |
 | A spinbox is blank or out of range, and the status line says so | The safety limits, years, or priorities could not be read | Type a number inside the range shown for that field, then Update preview | `OptionReader`, `AppController.refresh` |
@@ -522,8 +540,8 @@ Choosing a folder calls `_preview_saved_folder` on the background thread. That l
 | Choosing the folder does not restore the limits you typed last time | Those values are written when a preview or apply saves the model. A preview that fails on a bad recipe does not save | Make the recipes valid and Update preview | `core.operations.pipeline.cluster_directory`, `core.operations.model.save_model` |
 | The model file is missing after a preview, or the status mentions that it could not be saved | The preview still stands. Saving the JSON failed and was skipped | Check that the folder is writable | `core.operations.model.save_model`, `core.operations.pipeline` |
 | The spinner has a solid box behind it on Linux | Tk on X11 cannot make only part of a window transparent | Expected. macOS and Windows show only the animation and the text | `ui.view.spinner._transparent_background` |
-| Choose folder stays on “Reading the saved options…” | After the scan, the cluster list used to search the whole folder once for every event. With Write application log on, each of those steps was written, so the window never left that message | Quit that window, then choose the folder again. The list now reads the event folders once. Leave Write application log off unless you need the log | `ui.model.notes.seed_folder_notes` |
-| The operating system says the app is not responding after Choose folder, Apply, or Flatten | The read or the move used to run on the UI thread, so the event loop stopped | The Please wait dialog plays `spinner.gif` while the folder is read, before either confirmation, and again after you confirm while files move. `AppController._run_disk` does that work on a background thread and polls it with `root.after`. Buttons and option controls are locked. The timeline, calendar, and lists still respond | `ui.view.spinner.SpinnerDialog`, `AppView.lock_inputs`, `core.operations.pipeline.cluster_directory`, `core.operations.organize` |
+| Storage folder… stays on “Reading the saved options…” | After the scan, the cluster list used to search the whole folder once for every event. With Write application log on, each of those steps was written, so the window never left that message | Quit that window, then choose the folder again. The list now uses the event-folder names from the scan. The spinner also stays up while the window paints. Leave Write application log off unless you need the log | `ui.model.notes.seed_folder_notes`, `ui.view.runner.DiskRunner` |
+| The operating system says the app is not responding after Storage folder…, Apply, or Flatten | The read or the move used to run on the UI thread, so the event loop stopped. A huge folder also repeated the same directory listing | The Please wait dialog plays `spinner.gif` while the folder is read, before either confirmation, and again after you confirm while files move. It stays up while the lists are drawn. Apply skips the calculation when nothing has changed. Flatten plans during the first wait. `AppController._run_disk` does the disk work on a background thread and polls it with `root.after`. Buttons and option controls are locked. The timeline, calendar, and lists still respond | `ui.view.spinner.SpinnerDialog`, `AppView.lock_inputs`, `FolderPreviewing.refresh`, `survey_flatten` |
 | Apply or Flatten says the destination already has a file named … | That filename is already in the destination, so the move is waiting for replace or skip | Replace overwrites the destination. Skip leaves both files. Check “Do this for all (n) conflicts” to use one answer for the rest. Close the dialog to move nothing | `NameClashDialog`, `ClashResolver`, `core.operations.placement` |
 | Apply asks, then says it could not move | The disk rejected the move | Check that the folder is writable. The error dialog is followed by a fresh preview | `core.operations.organize.move_into_cluster_folders`, `AppController.apply_clustering` |
 | Flatten says it could not flatten | The disk rejected the move back | Check that the folder is writable, then Flatten again | `core.operations.organize.flatten_cluster_folders` |

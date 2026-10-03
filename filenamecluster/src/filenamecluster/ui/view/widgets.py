@@ -56,6 +56,21 @@ class WidgetKit:
         bar.pack(side="right", fill="y")
         return tree
 
+    def fill_tree(self, tree: ttk.Treeview, rows: tuple | list, batch: int = 400) -> None:
+        """Insert rows without holding the event loop for the whole list."""
+
+        tree.delete(*tree.get_children())
+
+        def write(start: int) -> None:
+            stop = min(start + batch, len(rows))
+            for index in range(start, stop):
+                tree.insert("", "end", iid=str(index), values=rows[index])
+            if stop < len(rows):
+                tree.after(1, lambda: write(stop))
+
+        if rows:
+            write(0)
+
     def text(self, widget, key: str):
         widget._i18n_key = key
         widget.configure(text=self.host.translate(key))

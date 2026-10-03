@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from filenamecluster.core import (
     Cluster,
@@ -95,3 +96,17 @@ class PlacementTests(unittest.TestCase):
             self.assertEqual((root / "IMG_20240101_100000.jpg").read_bytes(), b"inside")
             self.assertFalse(kept.exists())
             self.assertFalse(kept.parent.exists())
+
+    def test_a_prepared_flatten_plan_is_not_built_again(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "IMG_20240101_100000.jpg").write_bytes(b"inside")
+            from filenamecluster.core import cluster_directory
+
+            result = cluster_directory(root)
+            move_into_cluster_folders(root, result.clusters)
+            plan = plan_flatten_moves(root)
+            with patch("filenamecluster.core.operations.placement.plan_flatten_moves") as again:
+                self.assertEqual(flatten_cluster_folders(root, plan=plan), 1)
+            again.assert_not_called()
+            self.assertTrue((root / "IMG_20240101_100000.jpg").is_file())

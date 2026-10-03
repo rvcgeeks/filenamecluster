@@ -36,7 +36,7 @@ class PlacementPlan:
     clashes: tuple[PlannedMove, ...]
 
 
-def plan_cluster_moves(root: Path | str, clusters) -> PlacementPlan:
+def plan_cluster_moves(root: Path | str, clusters, source: Path | str | None = None) -> PlacementPlan:
     """The moves Apply would make. Nothing is created or moved."""
 
     filing = _filing()
@@ -48,11 +48,11 @@ def plan_cluster_moves(root: Path | str, clusters) -> PlacementPlan:
         folder = directory / cluster.name
         for item in cluster.files:
             filename = filing._single_component(item.name)
-            source = filing._source_path(directory, item, filename)
-            if not source.is_file():
-                detail("move_missing", source=str(source))
-                raise FileNotFoundError(source)
-            _classify(source, folder / filename, moves, clashes, claimed)
+            found = filing._source_path(directory, item, filename, source)
+            if not found.is_file():
+                detail("move_missing", source=str(found))
+                raise FileNotFoundError(found)
+            _classify(found, folder / filename, moves, clashes, claimed)
     detail("move_planned", files=len(moves), clashes=len(clashes))
     return PlacementPlan(tuple(moves), tuple(clashes))
 
@@ -60,30 +60,21 @@ def plan_cluster_moves(root: Path | str, clusters) -> PlacementPlan:
 def plan_flatten_moves(root: Path | str) -> PlacementPlan:
     """The moves Flatten would make. Nothing is moved."""
 
-    filing = _filing()
-    directory = _directory(root)
-    folders = [
-        entry
-        for entry in directory.iterdir()
-        if entry.is_dir() and filing.is_cluster_folder_name(entry.name)
-    ]
-    moves: list[PlannedMove] = []
-    clashes: list[PlannedMove] = []
-    claimed: set[Path] = set()
-    for folder in folders:
-        for entry in folder.iterdir():
-            if not entry.is_file():
-                continue
-            target = directory / filing._single_component(entry.name)
-            _classify(entry, target, moves, clashes, claimed)
-    detail("flatten_planned", files=len(moves), clashes=len(clashes), folders=len(folders))
-    return PlacementPlan(tuple(moves), tuple(clashes))
+    _names, plan = _flatten_plan(root)
+    return plan
+
+
+def survey_flatten(root: Path | str) -> tuple[tuple[str, ...], PlacementPlan]:
+    """Event-folder names and the flatten plan from one directory pass."""
+
+    return _flatten_plan(root)
 
 
 def commit_cluster_moves(
     root: Path | str,
     clusters,
     replacing: Collection[Path],
+    source: Path | str | None = None,
 ) -> list[Path]:
     """Create the event folders and move. Sources in ``replacing`` overwrite."""
 
@@ -102,23 +93,24 @@ def commit_cluster_moves(
         kept.add(folder.resolve())
         for item in cluster.files:
             filename = filing._single_component(item.name)
-            source = filing._source_path(directory, item, filename)
-            if not source.is_file():
-                detail("move_missing", source=str(source))
-                raise FileNotFoundError(source)
-            _place(source, folder / filename, allowed, claimed)
+            found = filing._source_path(directory, item, filename, source)
+            if not found.is_file():
+                detail("move_missing", source=str(found))
+                raise FileNotFoundError(found)
+            _place(found, folder / filename, allowed, claimed)
     filing._remove_empty_event_folders(directory, kept)
     detail("move_finished", folders=len(created))
     return created
 
 
-def commit_flatten_moves(root: Path | str, replacing: Collection[Path]) -> int:
+def commit_flatten_moves(root: Path | str, replacing: Collection[Path], plan: PlacementPlan | None = None) -> int:
     """Move event-folder files back. Sources in ``replacing`` overwrite."""
 
     filing = _filing()
     directory = _directory(root)
     detail("flatten_started", path=str(directory))
-    plan = plan_flatten_moves(directory)
+    if plan is None:
+        plan = plan_flatten_moves(directory)
     allowed = _resolved(replacing)
     claimed: set[Path] = set()
     moved = 0
@@ -139,6 +131,28 @@ def commit_flatten_moves(root: Path | str, replacing: Collection[Path]) -> int:
             continue
     detail("flatten_finished", moved=moved)
     return moved
+
+
+def _flatten_plan(root: Path | str) -> tuple[tuple[str, ...], PlacementPlan]:
+    filing = _filing()
+    directory = _directory(root)
+    folders = [
+        entry
+        for entry in directory.iterdir()
+        if entry.is_dir() and filing.is_cluster_folder_name(entry.name)
+    ]
+    moves: list[PlannedMove] = []
+    clashes: list[PlannedMove] = []
+    claimed: set[Path] = set()
+    for folder in folders:
+        for entry in folder.iterdir():
+            if not entry.is_file():
+                continue
+            target = directory / filing._single_component(entry.name)
+            _classify(entry, target, moves, clashes, claimed)
+    detail("flatten_planned", files=len(moves), clashes=len(clashes), folders=len(folders))
+    names = tuple(folder.name for folder in folders)
+    return names, PlacementPlan(tuple(moves), tuple(clashes))
 
 
 def _directory(root: Path | str) -> Path:

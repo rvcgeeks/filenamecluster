@@ -48,8 +48,7 @@ def seed_folder_notes(directory, result) -> dict[str, tuple[str, str]]:
     if directory is None or result is None:
         return {}
     saved = load_folder_notes(directory)
-    root = Path(directory)
-    names, by_stamp = _event_folders(root)
+    names, by_stamp = _event_folders_from(getattr(result, "ignored_directories", ()))
     notes: dict[str, tuple[str, str]] = {}
     for cluster in result.clusters:
         disk = _disk_note(cluster, names, by_stamp)
@@ -63,18 +62,11 @@ def seed_folder_notes(directory, result) -> dict[str, tuple[str, str]]:
     return notes
 
 
-def _event_folders(root: Path) -> tuple[set[str], dict[str, tuple[str, str]]]:
+def _event_folders_from(found) -> tuple[set[str], dict[str, tuple[str, str]]]:
     """Directory names, and the first event folder for each stamp."""
 
-    names: set[str] = set()
+    names: set[str] = set(found)
     by_stamp: dict[str, tuple[str, str]] = {}
-    if not root.is_dir():
-        return names, by_stamp
-    try:
-        found = [entry.name for entry in root.iterdir() if entry.is_dir()]
-    except OSError:
-        return names, by_stamp
-    names.update(found)
     for name in sorted(found):
         parts = event_folder_parts(name)
         if parts is None:

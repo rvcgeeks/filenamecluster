@@ -15,9 +15,9 @@ class MoveTests(WindowCase):
         seen: dict[str, bool] = {}
         real = relocation.move_into_cluster_folders
 
-        def wrapped(directory, clusters, replacing=frozenset()):
+        def wrapped(directory, clusters, replacing=frozenset(), source=None):
             seen["busy"] = self.app.model.busy
-            return real(directory, clusters, replacing=replacing)
+            return real(directory, clusters, replacing=replacing, source=source)
 
         with (
             patch.object(relocation, "move_into_cluster_folders", wrapped),

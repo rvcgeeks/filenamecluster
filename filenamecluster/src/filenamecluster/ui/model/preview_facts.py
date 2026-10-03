@@ -79,11 +79,16 @@ class PreviewFacts:
     def shown(self):
         """Events as draw values. The view does not receive core cluster objects."""
 
+        cached = getattr(self, "_shown", None)
+        if cached is not None:
+            return cached
         from .notes import noted_events
 
         book = getattr(self, "folder_notes", None)
         notes = {} if book is None else book.as_dict()
-        return noted_events(as_shown(self.result), notes)
+        shown = noted_events(as_shown(self.result), notes)
+        self._shown = shown
+        return shown
 
     @property
     def has_preview(self) -> bool:

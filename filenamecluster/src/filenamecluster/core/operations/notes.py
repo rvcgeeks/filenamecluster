@@ -21,14 +21,16 @@ from filenamecluster.core.parser.folders import (
 from filenamecluster.log import trace_module
 
 
-def noted_name(directory: Path | str, cluster) -> str:
+def noted_name(directory: Path | str, cluster, saved: dict | None = None, source: Path | str | None = None) -> str:
     """The folder name Apply should use, with the dominant note kept."""
 
-    note = _dominant_note(Path(directory), cluster)
+    note = _dominant_note(Path(directory), cluster, source)
     if note is None:
-        from filenamecluster.core.operations.model import load_folder_notes
+        if saved is None:
+            from filenamecluster.core.operations.model import load_folder_notes
 
-        note = load_folder_notes(directory).get(cluster.name)
+            saved = load_folder_notes(directory)
+        note = saved.get(cluster.name)
     if note is None:
         return cluster.name
     return name_with_note(note[0], cluster.name, note[1])
@@ -55,14 +57,27 @@ def find_event_folder(directory: Path | str, cluster) -> Path | None:
     return None
 
 
-def _dominant_note(directory: Path, cluster) -> tuple[str, str] | None:
+def _file_root(directory: Path, item, source: Path | str | None) -> Path:
+    if getattr(item, "origin", "") == "input" and source is not None:
+        return Path(source)
+    return directory
+
+
+def _dominant_note(directory: Path, cluster, source: Path | str | None = None) -> tuple[str, str] | None:
     """The note on the event folder that already holds the most of these files."""
 
     counts: dict[tuple[str, str], int] = {}
     order: list[tuple[str, str]] = []
+    existing: set[str] = set()
     for item in cluster.files:
         parent = _placed_parent(item)
-        if parent is None or not (directory / parent).is_dir():
+        if parent is None or parent in existing:
+            continue
+        if (_file_root(directory, item, source) / parent).is_dir():
+            existing.add(parent)
+    for item in cluster.files:
+        parent = _placed_parent(item)
+        if parent not in existing:
             continue
         note = folder_note(parent)
         if note is None:

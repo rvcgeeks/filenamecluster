@@ -11,6 +11,7 @@ from datetime import date, datetime, time, timedelta
 from tkinter import ttk
 
 from filenamecluster.log import trace_module
+from filenamecluster.ui.model import ShownEvent
 from .calendar import CalendarView
 from .folder_name import FolderNameEditor
 from .timeline import TimelineView
@@ -134,14 +135,22 @@ class ClustersTab:
     def present_day(self, day: date, clusters, entries, selected: int | None) -> None:
         self.calendar.select_day(day)
         start = datetime.combine(day, time())
-        self.day_view.show(clusters, start, start + timedelta(days=1))
+        end = start + timedelta(days=1)
+        row_values = [(f"{when:%H:%M:%S}", name, number) for when, name, number in entries]
+        narrowed = tuple(
+            ShownEvent(
+                cluster.number,
+                cluster.name,
+                cluster.start,
+                cluster.end,
+                tuple(item for item in cluster.files if start <= item.timestamp < end),
+            )
+            for cluster in clusters
+        )
+        self.day_view.show(narrowed, start, end)
         if selected is not None:
             self.day_view.select(selected, scroll=False)
-        self.day_tree.delete(*self.day_tree.get_children())
-        for row, (when, name, number) in enumerate(entries):
-            self.day_tree.insert(
-                "", "end", iid=str(row), values=(f"{when:%H:%M:%S}", name, number)
-            )
+        self.kit.fill_tree(self.day_tree, row_values)
         count = self.host.translate(
             "file_one" if len(entries) == 1 else "file_many",
             n=len(entries),

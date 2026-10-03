@@ -12,6 +12,7 @@ This file records user-visible changes to File Name Cluster. Versions follow sem
 - **Apply clustering** and **Flatten clustering** no longer stop when the destination already has a filename. A dialog says “The destination already has a file named …”. **Replace the file in the destination** overwrites that file. **Skip this file** leaves both files where they are. When more than one name clashes, **Do this for all (n) conflicts** uses that answer for the rest. Closing the dialog moves nothing. The same question covers a later batch copied beside existing event folders, and Flatten when a loose file already has that name.
 - The package version is now `0.1.5`.
 - Closing the window writes the options or the learned boundary when either has changed since the model file was last written. A number that cannot be read does not replace the options already stored. An unchanged file is left as it is.
+- A storage folder is required. **Storage folder…** chooses it. Event folders and `filenamecluster-model.json` are created there. **Input folder…** is optional. When it is not set, files are read from the storage folder, and the line under the title says “Input: same as storage”. When it is set, that line shows the other path, and files are read from both folders as one series. **Apply clustering** moves the input files into event folders under storage. **Read files from storage** clears the separate input folder and reads from storage again. Choosing an input folder before a storage folder explains that a storage folder is required. Choosing the storage folder itself as the input folder leaves the input the same as storage. **Flatten clustering** still returns files to the storage folder, not to the input folder.
 
 ### Fixed
 
@@ -23,6 +24,7 @@ This file records user-visible changes to File Name Cluster. Versions follow sem
 - The About tab, under “Which files are used” and “How to use it”, describes the replace-or-skip question and the extra words on an event folder, in every language.
 - The Skipped tab no longer lists an event folder. A folder whose name contains the event dates, including extra words before or after those dates, stays out of that list. Its files are already in the events. The status line still counts those folders, and Flatten still offers to undo them. Other subfolders, and files with no capture time, still appear under Skipped. The About tab says this in every language.
 - The clustering core (`filenamecluster.core`) is required to stay at 100% test coverage. The rest of the suite stays at or above 80%.
+- A large folder does less repeated reading. The wait overlay stays up while the lists and timelines are drawn. Apply does not calculate the clusters again when the files and the options are unchanged since the last preview. Flatten lists the event folders and plans the moves in one pass, so there is no separate name-check wait before that move. A name the storage folder already has still asks replace or skip. The day view walks only that day’s files. A long Skipped list or day list is filled in batches.
 
 ## 0.1.4
 

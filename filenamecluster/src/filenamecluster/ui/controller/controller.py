@@ -73,10 +73,34 @@ class AppController:
         self.model.reset_builtin()
         self.refresh()
 
-    def refresh(self, on_ready=None, wait: Wait = Wait.PREVIEW) -> None:
+    def refresh(self, on_ready=None, wait: Wait = Wait.PREVIEW, reuse: bool = False) -> None:
         """Re-scan the folder. Nothing is moved."""
 
-        self._previewing.refresh(on_ready, wait)
+        self._previewing.refresh(on_ready, wait, reuse=reuse)
+
+    def choose_input(self) -> None:
+        """Choose the folder files are read from. Storage stays where clusters are created."""
+
+        if self.model.directory is None:
+            from .requests import StorageRequired
+
+            self.ui.tell(StorageRequired())
+            return
+        chosen = self.ui.choose_directory(self.model.directory, "choose_input_title")
+        if not chosen:
+            return
+        self.model.set_input(Path(chosen))
+        event("input_chosen", path=str(self.model.input_directory or self.model.directory))
+        self.refresh()
+
+    def clear_input(self) -> None:
+        """Read files from the storage folder again."""
+
+        if self.model.directory is None or self.model.input_directory is None:
+            return
+        self.model.set_input(None)
+        event("input_cleared", path=str(self.model.directory))
+        self.refresh()
 
     def select_cluster(self, index: int | None, show_day: bool = True) -> None:
         result = self.model.result

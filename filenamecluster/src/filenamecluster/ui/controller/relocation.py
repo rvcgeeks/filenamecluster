@@ -13,14 +13,13 @@ from collections.abc import Callable
 from pathlib import Path
 
 from filenamecluster.core import (
-    event_folder_names,
     flatten_cluster_folders,
     folder_note,
     is_cluster_folder_name,
     is_folder,
     move_into_cluster_folders,
     plan_cluster_moves,
-    plan_flatten_moves,
+    survey_flatten,
 )
 from filenamecluster.log import event, log_call, trace_module
 from filenamecluster.ui.model import PreviewStaysStatus
@@ -55,7 +54,7 @@ class FolderRelocation:
     def apply(self) -> None:
         if self.model.busy or self.model.directory is None:
             return
-        self.refresh(on_ready=self._confirm_apply, wait=Wait.APPLY_CHECK)
+        self.refresh(on_ready=self._confirm_apply, wait=Wait.APPLY_CHECK, reuse=True)
 
     def flatten(self) -> None:
         if self.model.busy:
@@ -65,7 +64,7 @@ class FolderRelocation:
             return
 
         def list_folders():
-            return event_folder_names(directory)
+            return survey_flatten(directory)
 
         def after_list(outcome: Success | Failure) -> None:
             if isinstance(outcome, Failure):
@@ -74,7 +73,8 @@ class FolderRelocation:
                     self.ui.tell(CouldNotFlatten(str(error)))
                     return
                 raise error
-            self._confirm_flatten(directory, outcome.value)
+            names, plan = outcome.value
+            self._confirm_flatten(directory, names, plan)
 
         self.disk(Wait.FLATTEN_CHECK, list_folders, after_list)
 
@@ -99,6 +99,7 @@ class FolderRelocation:
             event("apply_cancelled", path=str(self.model.directory))
             return
         directory = self.model.directory
+        source = self.model.input_directory
         clusters = result.clusters
         files, events = result.file_count, len(result.clusters)
 
@@ -129,7 +130,7 @@ class FolderRelocation:
                 outcome.value.clashes,
                 Wait.APPLY,
                 lambda replacing: move_into_cluster_folders(
-                    directory, clusters, replacing=replacing
+                    directory, clusters, replacing=replacing, source=source
                 ),
                 finish,
                 "apply_cancelled",
@@ -137,9 +138,9 @@ class FolderRelocation:
             )
 
         log_call("filenamecluster.core.plan_cluster_moves")
-        self.disk(Wait.NAME_CHECK, lambda: plan_cluster_moves(directory, clusters), after_plan)
+        self.disk(Wait.NAME_CHECK, lambda: plan_cluster_moves(directory, clusters, source), after_plan)
 
-    def _confirm_flatten(self, directory: Path, folders) -> None:
+    def _confirm_flatten(self, directory: Path, folders, plan) -> None:
         """Ask, after the folder list, whether to move the files back."""
 
         if not folders:
@@ -159,22 +160,15 @@ class FolderRelocation:
             event("flatten_finished", path=str(directory), moved=moved)
             self.refresh(wait=Wait.AFTER_FLATTEN)
 
-        def after_plan(outcome: Success | Failure) -> None:
-            if isinstance(outcome, Failure):
-                self._failed(outcome, directory, CouldNotFlatten, "flatten_failed")
-                return
-            self._commit(
-                directory,
-                outcome.value.clashes,
-                Wait.FLATTEN,
-                lambda replacing: flatten_cluster_folders(directory, replacing=replacing),
-                finish,
-                "flatten_cancelled",
-                "filenamecluster.core.flatten_cluster_folders",
-            )
-
-        log_call("filenamecluster.core.plan_flatten_moves")
-        self.disk(Wait.NAME_CHECK, lambda: plan_flatten_moves(directory), after_plan)
+        self._commit(
+            directory,
+            plan.clashes,
+            Wait.FLATTEN,
+            lambda replacing: flatten_cluster_folders(directory, replacing=replacing, plan=plan),
+            finish,
+            "flatten_cancelled",
+            "filenamecluster.core.flatten_cluster_folders",
+        )
 
     def _commit(self, directory, clashes, wait, commit, finish, cancel_name: str, call_name: str) -> None:
         """Ask about each clash, then move on the disk thread."""

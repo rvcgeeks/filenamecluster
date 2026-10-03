@@ -26,14 +26,14 @@ class Dialogs:
         self._parent = parent
         self._translate = translate
 
-    def choose_directory(self, initial: Path) -> str:
+    def choose_directory(self, initial: Path, title_key: str = "choose_title") -> str:
         """Return the chosen folder, or an empty string when the user cancels."""
 
         start = initial if initial.is_dir() else Path.cwd()
         log_call("tkinter.filedialog.askdirectory")
         chosen = type(self)._filedialog.askdirectory(
             parent=self._parent,
-            title=self._translate("choose_title"),
+            title=self._translate(title_key),
             initialdir=start,
             mustexist=True,
         )

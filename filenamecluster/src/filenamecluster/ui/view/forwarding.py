@@ -104,8 +104,8 @@ class ViewForwarding:
     def tell_warning(self, title_key: str, body_key: str, **fields: object) -> None:
         self.messages.tell_warning(title_key, body_key, **fields)
 
-    def choose_directory(self, initial) -> str:
-        return self.messages.choose_directory(initial)
+    def choose_directory(self, initial, title_key: str = "choose_title") -> str:
+        return self.messages.choose_directory(initial, title_key)
 
     def _on_logging(self) -> None:
         self.options.on_logging()

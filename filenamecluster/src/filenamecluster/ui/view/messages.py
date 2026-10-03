@@ -23,6 +23,7 @@ from filenamecluster.ui.controller import (
     FolderMissing,
     NothingToFlatten,
     RenameRejected,
+    StorageRequired,
     NothingToMove,
     PatternBlank,
     PatternInvalid,
@@ -113,6 +114,8 @@ class Messages:
             self.tell_warning("file_missing_title", "file_missing_body", name=notice.name)
         elif isinstance(notice, FolderMissing):
             self.tell_warning("folder_missing_title", "folder_missing_body", name=notice.name)
+        elif isinstance(notice, StorageRequired):
+            self.tell_info("storage_required_title", "storage_required_body")
         elif isinstance(notice, RenameRejected):
             self._rename_rejected(notice)
         else:
@@ -148,8 +151,8 @@ class Messages:
     def wait_key(self, wait: Wait) -> str:
         return _WAITS[wait]
 
-    def choose_directory(self, initial: Path) -> str:
-        return self.host.dialogs.choose_directory(initial)
+    def choose_directory(self, initial: Path, title_key: str = "choose_title") -> str:
+        return self.host.dialogs.choose_directory(initial, title_key)
 
     def resolve_clash(self, clash: NameClash) -> None:
         """Translate one destination-name clash and let the dialog write the choice."""

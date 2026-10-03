@@ -35,6 +35,7 @@ class TimestampedFile:
     name: str
     timestamp: datetime
     source: str = ""
+    origin: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +79,47 @@ def scan_directory(directory: Path) -> FolderContents:
         other_directories=[name for name in directories if not is_cluster_folder_name(name)],
     )
     return FolderContents(tuple(files), tuple(directories), tuple(placed))
+
+
+def _same_directory(left: Path, right: Path) -> bool:
+    try:
+        return left.resolve() == right.resolve()
+    except OSError:
+        return left == right
+
+
+def _fingerprint_row(rows: list[tuple], origin: str, relative: str, path: Path) -> None:
+    try:
+        info = path.stat()
+    except OSError:
+        return
+    rows.append((origin, relative, info.st_size, info.st_mtime_ns))
+
+
+def fingerprint_listing(directory: Path, origin: str = "") -> tuple[FolderContents, tuple]:
+    """List ``directory`` once and record each file's size and modification time."""
+
+    root = Path(directory)
+    contents = scan_directory(root)
+    rows: list[tuple] = []
+    for name in contents.files:
+        _fingerprint_row(rows, origin, name, root / name)
+    for dirname, name in contents.placed:
+        _fingerprint_row(rows, origin, f"{dirname}/{name}", root / dirname / name)
+    return contents, tuple(rows)
+
+
+def folder_fingerprint(directory: Path | str, source: Path | str | None = None) -> tuple:
+    """Identity of the files a preview would read. The model file is not included."""
+
+    storage = Path(directory)
+    incoming = storage if source is None else Path(source)
+    _contents, rows = fingerprint_listing(storage, "")
+    collected = list(rows)
+    if not _same_directory(storage, incoming):
+        _incoming, extra = fingerprint_listing(incoming, "input")
+        collected.extend(extra)
+    return tuple(sorted(collected))
 
 
 def _files_inside_event_folder(folder: Path) -> list[tuple[str, str]]:

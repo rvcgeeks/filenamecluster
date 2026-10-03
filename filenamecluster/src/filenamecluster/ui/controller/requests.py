@@ -104,6 +104,11 @@ class FolderMissing:
 
 
 @dataclass(frozen=True, slots=True)
+class StorageRequired:
+    """Input was requested before a storage folder existed."""
+
+
+@dataclass(frozen=True, slots=True)
 class RenameRejected:
     """A folder rename the window should explain. ``reason`` is invalid, exists, or failed."""
 
@@ -145,6 +150,7 @@ Notice = (
     | CouldNotFlatten
     | FileMissing
     | FolderMissing
+    | StorageRequired
     | RenameRejected
 )
 

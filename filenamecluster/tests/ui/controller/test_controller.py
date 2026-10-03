@@ -30,6 +30,41 @@ class ControllerTests(WindowCase):
             self.app.controller.choose_folder()
         self.assertEqual(self.app.model.directory, self.folder)
 
+    def test_input_folder_is_optional_and_storage_is_required(self):
+        incoming = self.folder / "camera"
+        incoming.mkdir()
+        (incoming / "IMG_20240201_120000.jpg").write_bytes(b"camera")
+        with patch.object(Dialogs._messagebox, "showinfo") as info:
+            self.app.controller.choose_input()
+        self.assertEqual(info.call_args.args[0], t("storage_required_title"))
+        self.app.controller.clear_input()
+        self.assertIsNone(self.app.model.directory)
+
+        self.app.controller.load_folder(self.folder)
+        self.assertIsNone(self.app.model.input_directory)
+        self.assertIn(t("input_same"), self.app.view.input_text.get())
+        with patch.object(Dialogs._filedialog, "askdirectory", return_value=str(self.folder)) as picker:
+            self.app.controller.choose_input()
+        self.assertEqual(picker.call_args.kwargs["title"], t("choose_input_title"))
+        self.assertIsNone(self.app.model.input_directory)
+
+        with patch.object(Dialogs._filedialog, "askdirectory", return_value=""):
+            self.app.controller.choose_input()
+        self.assertIsNone(self.app.model.input_directory)
+
+        with patch.object(Dialogs._filedialog, "askdirectory", return_value=str(incoming)):
+            self.app.controller.choose_input()
+        self.assertEqual(self.app.model.input_directory, incoming)
+        self.assertIn(str(incoming), self.app.view.input_text.get())
+        names = {item.name for cluster in self.app.model.result.clusters for item in cluster.files}
+        self.assertIn("IMG_20240201_120000.jpg", names)
+        self.assertIn(PHOTOS[0], names)
+
+        self.app.controller.clear_input()
+        self.assertIsNone(self.app.model.input_directory)
+        names = {item.name for cluster in self.app.model.result.clusters for item in cluster.files}
+        self.assertNotIn("IMG_20240201_120000.jpg", names)
+
     def test_choosing_another_folder_replaces_the_preview(self):
         self.app.controller.load_folder(self.folder)
         with (
@@ -103,7 +138,7 @@ class ControllerTests(WindowCase):
             patch.object(Dialogs._messagebox, "showinfo"),
         ):
             self.app.controller.flatten_clustering()
-        self.assertEqual(keys, [Wait.FLATTEN_CHECK, Wait.NAME_CHECK, Wait.FLATTEN, Wait.AFTER_FLATTEN])
+        self.assertEqual(keys, [Wait.FLATTEN_CHECK, Wait.FLATTEN, Wait.AFTER_FLATTEN])
         for key in ("busy_open", "busy_preview", "busy_apply_check", "busy_apply", "busy_name_check",
                     "busy_flatten_check", "busy_flatten", "busy_after_flatten", "busy_after_error"):
             self.assertNotEqual(t(key), key)

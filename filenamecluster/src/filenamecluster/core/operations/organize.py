@@ -66,12 +66,16 @@ def name_clusters(clusters: list[Cluster] | tuple[Cluster, ...]) -> list[NamedCl
     ]
 
 
-def plan_cluster_moves(root: Path | str, clusters: list[NamedCluster] | tuple[NamedCluster, ...]):
+def plan_cluster_moves(
+    root: Path | str,
+    clusters: list[NamedCluster] | tuple[NamedCluster, ...],
+    source: Path | str | None = None,
+):
     """The moves Apply would make, including filenames the destination already has."""
 
     from filenamecluster.core.operations.placement import plan_cluster_moves as plan
 
-    return plan(root, _keeping_notes(root, clusters))
+    return plan(root, _keeping_notes(root, clusters, source), source)
 
 
 def plan_flatten_moves(root: Path | str):
@@ -86,6 +90,7 @@ def move_into_cluster_folders(
     root: Path | str,
     clusters: list[NamedCluster] | tuple[NamedCluster, ...],
     replacing: Collection[Path] | None = None,
+    source: Path | str | None = None,
 ) -> list[Path]:
     """Create one folder per cluster under ``root`` and move its files in.
 
@@ -101,18 +106,22 @@ def move_into_cluster_folders(
         plan_cluster_moves as plan,
     )
 
-    clusters = _keeping_notes(root, clusters)
+    clusters = _keeping_notes(root, clusters, source)
     if replacing is None:
-        planned = plan(root, clusters)
+        planned = plan(root, clusters, source)
         if planned.clashes:
             clash = planned.clashes[0]
             detail("move_blocked", source=str(clash.source), target=str(clash.target))
             raise FileExistsError(clash.target)
         replacing = ()
-    return commit_cluster_moves(root, clusters, replacing)
+    return commit_cluster_moves(root, clusters, replacing, source)
 
 
-def flatten_cluster_folders(root: Path | str, replacing: Collection[Path] | None = None) -> int:
+def flatten_cluster_folders(
+    root: Path | str,
+    replacing: Collection[Path] | None = None,
+    plan=None,
+) -> int:
     """Move files out of event folders back into ``root`` and remove those folders.
 
     Only immediate subfolders whose names match an event folder are touched.
@@ -125,13 +134,13 @@ def flatten_cluster_folders(root: Path | str, replacing: Collection[Path] | None
     from filenamecluster.core.operations.placement import commit_flatten_moves
 
     if replacing is None:
-        planned = plan_flatten_moves(root)
+        planned = plan_flatten_moves(root) if plan is None else plan
         if planned.clashes:
             clash = planned.clashes[0]
             detail("flatten_blocked", source=str(clash.source), target=str(clash.target))
             raise FileExistsError(clash.target)
         replacing = ()
-    return commit_flatten_moves(root, replacing)
+    return commit_flatten_moves(root, replacing, plan)
 
 
 def is_folder(path: Path | str) -> bool:
@@ -175,12 +184,17 @@ def event_folder(directory: Path | str, name: str) -> Path | None:
     return None
 
 
-def locate_file(directory: Path | str, item: TimestampedFile, cluster_name: str) -> Path | None:
+def locate_file(
+    directory: Path | str,
+    item: TimestampedFile,
+    cluster_name: str,
+    source: Path | str | None = None,
+) -> Path | None:
     """Where ``item`` sits now, including an event folder created by Apply."""
 
     root = Path(directory)
     try:
-        current = _source_path(root, item, item.name)
+        current = _source_path(root, item, item.name, source)
     except ValueError:
         return None
     if current.is_file():
@@ -200,15 +214,21 @@ def locate_file(directory: Path | str, item: TimestampedFile, cluster_name: str)
     return None
 
 
-def _keeping_notes(root: Path | str, clusters: list[NamedCluster] | tuple[NamedCluster, ...]):
+def _keeping_notes(
+    root: Path | str,
+    clusters: list[NamedCluster] | tuple[NamedCluster, ...],
+    source: Path | str | None = None,
+):
     """Copy each cluster, using a folder name that still carries its note."""
 
+    from filenamecluster.core.operations.model import load_folder_notes
     from filenamecluster.core.operations.notes import noted_name
 
     directory = Path(root)
+    saved = load_folder_notes(directory)
     renamed: list[NamedCluster] = []
     for cluster in clusters:
-        name = noted_name(directory, cluster)
+        name = noted_name(directory, cluster, saved, source)
         if name == cluster.name:
             renamed.append(cluster)
             continue
@@ -222,9 +242,17 @@ def _single_component(name: str) -> str:
     return name
 
 
-def _source_path(directory: Path, item: TimestampedFile, filename: str) -> Path:
-    """Where ``item`` sits now: the chosen folder, or one event folder inside it."""
+def _source_path(
+    directory: Path,
+    item: TimestampedFile,
+    filename: str,
+    source: Path | str | None = None,
+) -> Path:
+    """Where ``item`` sits now: storage, the input folder, or an event folder."""
 
+    root = directory
+    if getattr(item, "origin", "") == "input" and source is not None:
+        root = Path(source)
     relative = Path(item.source) if item.source else Path(filename)
     if relative.is_absolute() or any(part in {"", ".", ".."} for part in relative.parts):
         raise ValueError(f"unsafe filename: {item.source or filename}")
@@ -236,7 +264,7 @@ def _source_path(directory: Path, item: TimestampedFile, filename: str) -> Path:
             raise ValueError(f"unsafe filename: {item.source}")
     else:
         raise ValueError(f"unsafe filename: {item.source or filename}")
-    return directory / relative
+    return root / relative
 
 
 def _same_file(source: Path, target: Path) -> bool:

@@ -69,7 +69,7 @@ class PreparedPreview:
 class FolderPreview:
     """Load ``filenamecluster-model.json`` and cluster the folder."""
 
-    def scan(self, directory: Path) -> FolderScan:
+    def scan(self, directory: Path, source: Path | None = None) -> FolderScan:
         """Scan one folder and report how its saved options were treated."""
 
         loaded = load_model(directory)
@@ -87,7 +87,7 @@ class FolderPreview:
             params, patterns = accepted
         try:
             log_call("filenamecluster.core.operations.pipeline.cluster_directory")
-            result = cluster_directory(directory, params, patterns)
+            result = cluster_directory(directory, params, patterns, source=source, loaded=loaded)
         except OSError as exc:
             return FolderScan(ScanState.READ_ERROR, saved, options, error=exc)
         if accepted is not None:
@@ -119,7 +119,7 @@ class FolderPreview:
             tuple(table),
         )
 
-    def current(self, directory: Path, prepared: PreparedPreview) -> CurrentPreview:
+    def current(self, directory: Path, prepared: PreparedPreview, source: Path | None = None) -> CurrentPreview:
         """Preview prepared drafts and persist each rule's validity marker."""
 
         marked = [
@@ -127,7 +127,13 @@ class FolderPreview:
             for iid, key, description, pattern, _dirty in prepared.table
         ]
         log_call("filenamecluster.core.operations.pipeline.cluster_directory")
-        result = cluster_directory(directory, prepared.params, prepared.patterns)
+        result = cluster_directory(
+            directory,
+            prepared.params,
+            prepared.patterns,
+            source=source,
+            loaded=load_model(directory),
+        )
         RuleLedger.mark(directory, marked)
         return CurrentPreview(result, prepared.invalid)
 

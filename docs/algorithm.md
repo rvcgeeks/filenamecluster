@@ -83,9 +83,9 @@ This algorithm was not chosen in a vacuum. The useful solution had to satisfy al
 2. **Work for different shooting habits.** One person may take hundreds of photographs per day; another may leave several days between photographs from the same trip. One universal gap such as 12 or 24 hours cannot fit both.
 3. **Keep chronological events contiguous.** After sorting by time, an event must be one uninterrupted interval. This is segmentation of a sequence, not arbitrary clustering where photo 1 and photo 100 can join while the photos between them do not.
 4. **Be deterministic and explainable.** The same names and settings must produce the same folders. The learned boundary must be visible as a number that can be explained and audited.
-5. **Run locally with no training service.** It must work offline, with Python's standard library, on one folder at a time. There is no labelled training set and no global model downloaded from somewhere else.
+5. **Run locally with no training service.** It must work offline, with Python's standard library, on one storage folder at a time. An optional input folder only supplies more files. The boundary and the model file still belong to that one storage folder. There is no labelled training set and no global model downloaded from somewhere else.
 6. **Remain safe on strange folders.** A burst of near-identical times must not create hundreds of events. A many-month gap must not be joined merely because a fitted model is poor. Too few useful gaps must not produce a confident but meaningless fit.
-7. **Accept later batches.** Existing event folders and newly copied files must be put back into one chronological sequence. With enough evidence the model should refit; without enough evidence it should reuse the last boundary.
+7. **Accept later batches.** Existing event folders and newly copied files, including files read from an optional input folder, must be put back into one chronological sequence. With enough evidence the model should refit; without enough evidence it should reuse the last boundary.
 8. **Scale linearly after sorting.** Thousands of files should be ordinary work. The algorithm should not compare every file with every other file.
 
 The timestamp-only requirement is the most restrictive one. A human can see that two photos show the same birthday cake. This program cannot. It can only see that their clocks are close. Therefore this is a **temporal event segmenter**, not a semantic understanding system.
@@ -847,15 +847,15 @@ The fitted triple $(e^{\mu_w}, e^{\mu_b}, e^{\tau})$ and the flag $\mu_b-\mu_w \
 
 Code: the four learned fields are `GapModel` in `core/algorithm/fit.py`. The write, with no rounding, is `_learned_document` in `core/operations/model.py`, called from `save_model`. The same write stores `options` through `_options_document`. The Options tab shows the four learned fields, `learned.within_hours`, `learned.between_hours`, `learned.boundary_hours`, and `learned.separated`, in a read-only table. The numbers are formatted with `json.dumps`, so they match the file. When no boundary was fitted, each value is `null`. A missing or unusable `options` object leaves the defaults in place and keeps a valid `learned` object.
 
-On a later scan the sequence is rebuilt from every timestamped file in the chosen folder and inside existing event folders, sorted again as one series. $\mathcal{U}$ is recomputed from that series.
+On a later scan the sequence is rebuilt from every timestamped file in the storage folder and inside existing event folders there. When an input folder is set to a different path, that folder is read the same way and added to the same series. $\mathcal{U}$ is recomputed from that series.
 
-> **In simple words.** Later, you copy some new photos into the same folder and look again. The app does not forget the old photos. It collects **all** of them: the new loose photos, and the photos already sitting inside event folders from last time. It lines them all up again, from the beginning, as one long line, and measures every wait again.
+> **In simple words.** Later, you copy some new photos into the storage folder, or into the input folder when you set one, and look again. The app does not forget the old photos. It collects **all** of them: the new loose photos, and the photos already sitting inside event folders from last time. It lines them all up again, from the beginning, as one long line, and measures every wait again.
 
-Code: loose files and files already inside event folders are collected in `core/operations/pipeline.py` lines 97–118, then sorted inside `cluster` (`core/algorithm/cluster.py` line 84). $\mathcal{U}$ is rebuilt at `core/algorithm/cluster.py` lines 102–106.
+Code: `cluster_directory` in `core/operations/pipeline.py` lists the storage folder with `fingerprint_listing`, and lists a different input folder with origin `input`, at lines 123–132. `cluster` sorts the combined files at `core/algorithm/cluster.py` line 119. $\mathcal{U}$ is rebuilt at `core/algorithm/cluster.py` lines 137–141.
 
-- If $|\mathcal{U}| \ge 4$, $\tau$ is fitted again from the whole series. The previous numbers are replaced. Code: `core/algorithm/cluster.py` line 149, then `core/operations/pipeline.py` lines 121–126.
-- If $|\mathcal{U}| < 4$ and a boundary was saved, that saved $\tau$ is used in the decision rule above. Code: `core/algorithm/cluster.py` lines 150–153, loaded earlier by `core/operations/pipeline.py` line 76.
-- If $|\mathcal{U}| < 4$ and nothing was saved, the 36-hour fallback is used. Code: `core/algorithm/split.py` lines 31–32, called from `core/algorithm/cluster.py` lines 141–142.
+- If $|\mathcal{U}| \ge 4$, $\tau$ is fitted again from the whole series. The previous numbers are replaced. Code: `core/algorithm/cluster.py` line 149, then `save_model` in `core/operations/pipeline.py` lines 137–141.
+- If $|\mathcal{U}| < 4$ and a boundary was saved, that saved $\tau$ is used in the decision rule above. Code: `core/algorithm/cluster.py` lines 150–153, loaded earlier by `core/operations/pipeline.py` lines 97–101.
+- If $|\mathcal{U}| < 4$ and nothing was saved, the 36-hour fallback is used. Code: `core/algorithm/split.py` lines 31–32, called from `core/algorithm/cluster.py` lines 176–177.
 
 > **In simple words.** Then one of three things happens:
 >

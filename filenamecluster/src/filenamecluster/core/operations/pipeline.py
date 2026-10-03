@@ -11,7 +11,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from filenamecluster.core.algorithm.cluster import ClusterParams, ModelOptions, cluster
+from filenamecluster.core.algorithm.cluster import ClusterParams, FolderModel, ModelOptions, cluster
 from filenamecluster.core.algorithm.fit import GapModel
 from filenamecluster.core.exif import read_exif_timestamp
 from .model import load_model, save_model
@@ -22,8 +22,8 @@ from filenamecluster.core.parser import (
     TimestampPatterns,
     TimestampedFile,
     parse_timestamp,
-    scan_directory,
 )
+from filenamecluster.core.parser.scan import _same_directory, fingerprint_listing
 from filenamecluster.log import detail, event, log_call, trace_module
 
 
@@ -36,6 +36,8 @@ class ClusterResult:
     ignored_directories: tuple[str, ...]
     params: ClusterParams
     model: GapModel | None = None
+    fingerprint: tuple = ()
+    signature: tuple = ()
 
     @property
     def file_count(self) -> int:
@@ -58,10 +60,27 @@ def _capture_time(path: Path, name: str, compiled: CompiledTimestampPatterns) ->
         return None
 
 
+def option_signature(params: ClusterParams, patterns: TimestampPatterns) -> tuple:
+    """The option values that change a preview. File timestamps are separate."""
+
+    return (
+        params.floor_hours,
+        params.ceiling_hours,
+        patterns.min_year,
+        patterns.max_year,
+        patterns.prec_clock,
+        patterns.prec_epoch,
+        patterns.prec_date,
+        tuple((rule.key, rule.description, rule.pattern) for rule in patterns.rules),
+    )
+
+
 def cluster_directory(
     directory: Path | str,
     params: ClusterParams | None = None,
     patterns: TimestampPatterns | None = None,
+    source: Path | str | None = None,
+    loaded: FolderModel | None = None,
 ) -> ClusterResult:
     """Cluster the files in ``directory`` by capture time.
 
@@ -72,9 +91,14 @@ def cluster_directory(
     """
 
     folder = Path(directory)
+    incoming = folder if source is None else Path(source)
+    separate = not _same_directory(folder, incoming)
     event("cluster_started", path=str(folder))
-    log_call("filenamecluster.core.operations.model.load_model")
-    corrections = load_model(folder)
+    if loaded is None:
+        log_call("filenamecluster.core.operations.model.load_model")
+        corrections = load_model(folder)
+    else:
+        corrections = loaded
     chosen = params if params is not None else _params_from_options(corrections.options)
     pattern_source = patterns if patterns is not None else _patterns_from_options(corrections.options)
     detail(
@@ -96,27 +120,17 @@ def cluster_directory(
     )
     compiled = pattern_source.compile()
     log_call("filenamecluster.core.parser.scan_directory")
-    contents = scan_directory(folder)
+    contents, storage_rows = fingerprint_listing(folder, "")
+    incoming_contents = None
+    incoming_rows: tuple = ()
+    if separate:
+        incoming_contents, incoming_rows = fingerprint_listing(incoming, "input")
     stamped: list[TimestampedFile] = []
     ignored: list[str] = []
-    for name in contents.files:
-        stamp = _capture_time(folder / name, name, compiled)
-        if stamp is None:
-            # No filename clock, and the capture time could not be read.
-            ignored.append(name)
-            detail("capture_missing", name=name)
-        else:
-            stamped.append(TimestampedFile(name, stamp))
-            detail("capture_read", name=name, stamp=stamp.isoformat(sep=" "), source="loose")
-    for dirname, name in contents.placed:
-        stamp = _capture_time(folder / dirname / name, name, compiled)
-        placed_name = f"{dirname}/{name}"
-        if stamp is None:
-            ignored.append(placed_name)
-            detail("capture_missing", name=placed_name)
-        else:
-            stamped.append(TimestampedFile(name, stamp, source=placed_name))
-            detail("capture_read", name=placed_name, stamp=stamp.isoformat(sep=" "), source="event_folder")
+    _collect(folder, contents, "", compiled, stamped, ignored)
+    if incoming_contents is not None:
+        _collect(incoming, incoming_contents, "input", compiled, stamped, ignored)
+    fingerprint = tuple(sorted((*storage_rows, *incoming_rows)))
     log_call("filenamecluster.core.algorithm.cluster.cluster")
     clusters, learned = cluster(stamped, chosen, corrections)
     try:
@@ -130,12 +144,48 @@ def cluster_directory(
     result = ClusterResult(
         clusters=tuple(name_clusters(clusters)),
         ignored_without_timestamp=tuple(ignored),
-        ignored_directories=contents.directories,
+        ignored_directories=_directories(contents, incoming_contents),
         params=chosen,
         model=learned,
+        fingerprint=fingerprint,
+        signature=option_signature(chosen, pattern_source),
     )
     event("cluster_finished", path=str(folder), events=len(result.clusters), files=result.file_count)
     return result
+
+
+def _collect(root: Path, contents, origin: str, compiled, stamped: list, ignored: list) -> None:
+    """Read a capture time for every listed file under ``root``."""
+
+    for name in contents.files:
+        label = name if origin == "" else f"{root.name}/{name}"
+        stamp = _capture_time(root / name, name, compiled)
+        if stamp is None:
+            ignored.append(label)
+            detail("capture_missing", name=label)
+            continue
+        stamped.append(TimestampedFile(name, stamp, origin=origin))
+        detail("capture_read", name=label, stamp=stamp.isoformat(sep=" "), source="loose")
+    for dirname, name in contents.placed:
+        placed_name = f"{dirname}/{name}"
+        label = placed_name if origin == "" else f"{root.name}/{placed_name}"
+        stamp = _capture_time(root / dirname / name, name, compiled)
+        if stamp is None:
+            ignored.append(label)
+            detail("capture_missing", name=label)
+            continue
+        stamped.append(TimestampedFile(name, stamp, source=placed_name, origin=origin))
+        detail("capture_read", name=label, stamp=stamp.isoformat(sep=" "), source="event_folder")
+
+
+def _directories(storage, incoming) -> tuple[str, ...]:
+    names = list(storage.directories)
+    if incoming is None:
+        return tuple(names)
+    for name in incoming.directories:
+        if name not in names:
+            names.append(name)
+    return tuple(names)
 
 
 def _params_from_options(options: ModelOptions | None) -> ClusterParams:

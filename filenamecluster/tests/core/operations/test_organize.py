@@ -68,6 +68,22 @@ class ClusterNameTests(unittest.TestCase):
         self.assertEqual(named[1].end, named[1].start)
 
 class MoveTests(unittest.TestCase):
+    def test_input_folder_files_move_into_storage(self):
+        with TemporaryDirectory() as tmp:
+            storage = Path(tmp) / "storage"
+            incoming = Path(tmp) / "camera"
+            storage.mkdir()
+            incoming.mkdir()
+            (incoming / "IMG_20240101_100000.jpg").write_bytes(b"from-input")
+            result = cluster_directory(storage, source=incoming)
+            self.assertEqual(result.file_count, 1)
+            self.assertEqual(result.clusters[0].files[0].origin, "input")
+            created = move_into_cluster_folders(storage, result.clusters, source=incoming)
+            placed = created[0] / "IMG_20240101_100000.jpg"
+            self.assertEqual(placed.read_bytes(), b"from-input")
+            self.assertFalse((incoming / "IMG_20240101_100000.jpg").exists())
+            self.assertTrue((storage / "filenamecluster-model.json").is_file())
+
     def test_moves_files_into_named_folders(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

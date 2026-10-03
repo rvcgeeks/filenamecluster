@@ -16,8 +16,9 @@ from .scan import (
     MODEL_NAME,
     FolderContents,
     TimestampedFile,
-    is_cluster_folder_name,
     _from_epoch_millis,
+    folder_fingerprint,
+    is_cluster_folder_name,
     parse_timestamp,
     scan_directory,
 )
@@ -33,6 +34,7 @@ __all__ = [
     "TimestampPatterns",
     "TimestampedFile",
     "event_folder_parts",
+    "folder_fingerprint",
     "is_cluster_folder_name",
     "name_with_note",
     "parse_timestamp",

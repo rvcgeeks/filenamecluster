@@ -1,6 +1,8 @@
 """FolderPreviewing: preview the chosen folder, or say that none is chosen."""
 
-from filenamecluster.ui.view import t
+from unittest.mock import patch
+
+from filenamecluster.ui.view import Dialogs, t
 from conftest import WindowCase
 
 
@@ -9,3 +11,13 @@ class PreviewingTests(WindowCase):
         self.app.controller.refresh()
         self.assertEqual(self.app.view.status_text.get(), t("choose_status"))
         self.assertIsNone(self.app.model.result)
+
+    def test_apply_reuses_a_fresh_preview(self):
+        self.app.controller.load_folder(self.folder)
+        with (
+            patch("filenamecluster.core.operations.preview.cluster_directory") as cluster,
+            patch.object(Dialogs._messagebox, "askyesno", return_value=True),
+            patch.object(Dialogs._messagebox, "showinfo"),
+        ):
+            self.app.controller.apply_clustering()
+        cluster.assert_not_called()

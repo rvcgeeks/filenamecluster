@@ -47,6 +47,7 @@ class AppView(ViewForwarding):
         self.equal_columns_job: str | None = None
         self.options_columns = None
         self.folder_text = tk.StringVar(root, self.translate("no_folder"))
+        self.input_text = tk.StringVar(root, self.translate("input_same"))
         self.status_text = tk.StringVar(root, self.translate("choose_status"))
         self.language_var = tk.StringVar(
             root, next(name for code, name in LANGUAGES if code == "en")
@@ -152,6 +153,11 @@ class AppView(ViewForwarding):
 
     def set_folder(self, path: str) -> None:
         self.folder_text.set(path)
+        incoming = None if self.model is None else self.model.input_directory
+        if incoming is None:
+            self.input_text.set(self.translate("input_same"))
+        else:
+            self.input_text.set(self.translate("input_path", path=incoming))
 
     def translate(self, key: str, **fields: object) -> str:
         """Translate from the model's authoritative language."""
@@ -219,6 +225,7 @@ class AppView(ViewForwarding):
         text.pack(side="left", fill="x", expand=True)
         self.kit.text(ttk.Label(text, style="Title.TLabel"), "app_title").pack(anchor="w")
         ttk.Label(text, textvariable=self.folder_text, style="Path.TLabel").pack(anchor="w")
+        ttk.Label(text, textvariable=self.input_text, style="Path.TLabel").pack(anchor="w")
         self.apply_button = self.kit.text(
             ttk.Button(header, style="Accent.TButton", command=self.request_apply, state="disabled"),
             "apply",
@@ -231,6 +238,12 @@ class AppView(ViewForwarding):
         self.flatten_button.pack(side="right", padx=(0, 8))
         self.kit.text(ttk.Button(header, command=self.actions.choose_folder), "choose_folder").pack(
             side="right", padx=8
+        )
+        self.kit.text(ttk.Button(header, command=self.actions.choose_input), "choose_input").pack(
+            side="right"
+        )
+        self.kit.text(ttk.Button(header, command=self.actions.clear_input), "clear_input").pack(
+            side="right", padx=(0, 8)
         )
         language_box = ttk.Combobox(
             header,

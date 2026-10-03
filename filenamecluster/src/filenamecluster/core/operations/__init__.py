@@ -33,8 +33,14 @@ from .organize import (
 )
 from .options import OptionReader, rule_error
 from .ledger import RuleLedger
-from .pipeline import ClusterResult, _params_from_options, _patterns_from_options, cluster_directory
-from .placement import PlannedMove, _overwrite, commit_cluster_moves
+from .pipeline import (
+    ClusterResult,
+    _params_from_options,
+    _patterns_from_options,
+    cluster_directory,
+    option_signature,
+)
+from .placement import PlannedMove, _overwrite, commit_cluster_moves, survey_flatten
 from .preview import (
     CurrentPreview,
     FolderPreview,
@@ -86,4 +92,6 @@ __all__ = [
     "plan_flatten_moves",
     "rule_error",
     "save_model",
+    "option_signature",
+    "survey_flatten",
 ]

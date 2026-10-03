@@ -90,9 +90,11 @@ from filenamecluster.core.operations import (
     noted_name,
     plan_cluster_moves,
     plan_flatten_moves,
+    option_signature,
     rule_error,
     save_model,
     store_if_changed,
+    survey_flatten,
 )
 from filenamecluster.core.parser import (
     DEFAULT_RULES,
@@ -105,6 +107,7 @@ from filenamecluster.core.parser import (
     TimestampedFile,
     _from_epoch_millis,
     event_folder_parts,
+    folder_fingerprint,
     name_with_note,
     parse_timestamp,
     scan_directory,
@@ -178,6 +181,7 @@ __all__ = [
     "event_folder_names",
     "event_folder_parts",
     "find_event_folder",
+    "folder_fingerprint",
     "fit",
     "flatten_cluster_folders",
     "folder_note",
@@ -192,6 +196,7 @@ __all__ = [
     "move_into_cluster_folders",
     "name_clusters",
     "name_with_note",
+    "option_signature",
     "noted_name",
     "parse_timestamp",
     "plan_cluster_moves",
@@ -201,6 +206,7 @@ __all__ = [
     "save_model",
     "scan_directory",
     "split",
+    "survey_flatten",
     "store_if_changed",
 ]
 

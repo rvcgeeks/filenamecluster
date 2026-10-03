@@ -42,9 +42,11 @@ class DiskRunner:
             if not outcome_box.get("done"):
                 root.after(50, poll)
                 return
-            dialog.close()
             error = outcome_box.get("error")
-            on_done(error if error is not None else outcome_box.get("value"))
+            try:
+                on_done(error if error is not None else outcome_box.get("value"))
+            finally:
+                dialog.close()
 
         threading.Thread(target=worker, name="filenamecluster-disk", daemon=True).start()
         root.after(50, poll)

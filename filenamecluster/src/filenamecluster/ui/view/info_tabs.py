@@ -70,13 +70,11 @@ class InfoTabs:
     def show_skipped(self, folders, files) -> None:
         """``folders`` and ``files`` are ``(name, reason_key)`` pairs."""
 
-        self.skipped_tree.delete(*self.skipped_tree.get_children())
-        for name, reason in tuple(folders) + tuple(files):
-            self.skipped_tree.insert(
-                "",
-                "end",
-                values=(name, self.host.translate(_REASON_KEYS[reason])),
-            )
+        rows = tuple(
+            (name, self.host.translate(_REASON_KEYS[reason]))
+            for name, reason in tuple(folders) + tuple(files)
+        )
+        self.kit.fill_tree(self.skipped_tree, rows)
 
     def fill_about(self) -> None:
         text = self.about_text

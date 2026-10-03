@@ -37,7 +37,12 @@ class OpenActions:
         if self._model.directory is None or found is None:
             return
         item, index = found
-        path = locate_file(self._model.directory, item, self._cluster_name(index))
+        path = locate_file(
+            self._model.directory,
+            item,
+            self._cluster_name(index),
+            self._model.input_directory,
+        )
         if path is None:
             self._ui.tell(FileMissing(item.name))
             return

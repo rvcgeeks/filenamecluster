@@ -47,6 +47,9 @@ _VIDEO_BRANDS = {
 _MOVIE_BOXES = {b"moov", b"mdat", b"wide", b"free", b"skip"}
 
 
+_CLOCK_CACHE: dict[tuple, datetime | None] = {}
+
+
 def read_exif_timestamp(
     path: Path | str,
     min_year: int = 1990,
@@ -63,9 +66,26 @@ def read_exif_timestamp(
 
     file = Path(path)
     try:
-        if not file.is_file():
-            detail("metadata_skipped", path=str(file), reason="not_a_file")
-            return None
+        info = file.stat()
+    except OSError:
+        detail("metadata_skipped", path=str(file), reason="not_a_file")
+        return None
+    if not file.is_file():
+        detail("metadata_skipped", path=str(file), reason="not_a_file")
+        return None
+    try:
+        key = (str(file.resolve()), info.st_size, info.st_mtime_ns, min_year, max_year)
+    except OSError:
+        key = None
+    if key is not None and key in _CLOCK_CACHE:
+        return _CLOCK_CACHE[key]
+
+    def finish(stamp: datetime | None) -> datetime | None:
+        if key is not None:
+            _CLOCK_CACHE[key] = stamp
+        return stamp
+
+    try:
         with file.open("rb") as handle:
             header = handle.read(16)
             handle.seek(0)
@@ -78,7 +98,7 @@ def read_exif_timestamp(
                     found=stamp is not None,
                     stamp=None if stamp is None else stamp.isoformat(sep=" "),
                 )
-                return stamp
+                return finish(stamp)
             if header.startswith(b"%PDF-"):
                 stamp = _pdf_timestamp(handle, min_year, max_year)
                 detail(
@@ -88,19 +108,19 @@ def read_exif_timestamp(
                     found=stamp is not None,
                     stamp=None if stamp is None else stamp.isoformat(sep=" "),
                 )
-                return stamp
+                return finish(stamp)
             payload = _exif_payload(handle, header)
     except Exception:  # noqa: BLE001  # a damaged container must not stop the scan
         detail("metadata_skipped", path=file.name, reason="unreadable")
-        return None
+        return finish(None)
     if not payload:
         detail("metadata_skipped", path=file.name, reason="no_exif")
-        return None
+        return finish(None)
     try:
         stamp = _datetime_from_tiff(payload, min_year, max_year)
     except Exception:  # noqa: BLE001  # a damaged container must not stop the scan
         detail("metadata_skipped", path=file.name, reason="bad_exif")
-        return None
+        return finish(None)
     detail(
         "metadata_clock",
         path=file.name,
@@ -108,7 +128,7 @@ def read_exif_timestamp(
         found=stamp is not None,
         stamp=None if stamp is None else stamp.isoformat(sep=" "),
     )
-    return stamp
+    return finish(stamp)
 
 
 def _exif_payload(handle, header: bytes) -> bytes | None:
