@@ -2,7 +2,7 @@
 
 import unittest
 
-from filenamecluster.core.algorithm import FALLBACK_HOURS, split
+from filenamecluster.core import FALLBACK_HOURS, split
 
 
 class SplitTests(unittest.TestCase):

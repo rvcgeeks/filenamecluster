@@ -5,16 +5,17 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.algorithm.cluster import Cluster
-from filenamecluster.core.operations.notes import find_event_folder, noted_name
-from filenamecluster.core.operations.organize import (
+from filenamecluster.core import (
+    Cluster,
     NamedCluster,
+    TimestampedFile,
+    cluster_directory,
+    find_event_folder,
     flatten_cluster_folders,
     move_into_cluster_folders,
     name_clusters,
+    noted_name,
 )
-from filenamecluster.core.operations.pipeline import cluster_directory
-from filenamecluster.core.parser import TimestampedFile
 
 
 def _photo(folder: Path, name: str, payload: bytes) -> None:
@@ -134,7 +135,7 @@ class NoteTests(unittest.TestCase):
             self.assertIsNone(find_event_folder(root, cluster))
 
     def test_a_saved_note_is_used_when_no_folder_holds_the_files(self):
-        from filenamecluster.core.operations import keep_folder_notes
+        from filenamecluster.core import keep_folder_notes
 
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

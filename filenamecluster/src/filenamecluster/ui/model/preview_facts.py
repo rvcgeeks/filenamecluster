@@ -10,7 +10,7 @@ import json
 import sys
 from datetime import date
 
-from filenamecluster.core.operations.organize import is_cluster_folder_name
+from filenamecluster.core import is_cluster_folder_name
 from filenamecluster.log import trace_module
 from .display import LearnedKind, LearnedSummary, SkippedReason, as_shown, cover_days
 

@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.exif import read_exif_timestamp
+from filenamecluster.core import read_exif_timestamp
 
 WHEN = "2024:06:01 12:30:45"
 OLDER = "2010:01:01 08:00:00"

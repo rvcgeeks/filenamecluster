@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 
-from filenamecluster.core.operations import rule_error
+from filenamecluster.core import rule_error
 from filenamecluster.log import trace_module
 from .ports import DialogPort
 from .requests import PatternBlank, PatternInvalid, PatternValid

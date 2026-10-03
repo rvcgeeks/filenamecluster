@@ -3,10 +3,7 @@
 import unittest
 from datetime import date, datetime
 
-from filenamecluster.core.algorithm.cluster import ClusterParams
-from filenamecluster.core.operations.organize import NamedCluster
-from filenamecluster.core.parser import TimestampedFile
-from filenamecluster.core.operations.pipeline import ClusterResult
+from filenamecluster.core import ClusterParams, ClusterResult, NamedCluster, TimestampedFile
 from filenamecluster.ui.model import AppModel, ChooseStatus, Topic
 
 

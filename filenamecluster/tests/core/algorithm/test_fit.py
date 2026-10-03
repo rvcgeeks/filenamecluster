@@ -3,8 +3,7 @@
 import math
 import unittest
 
-from filenamecluster.core.algorithm import fit
-from filenamecluster.core.algorithm.fit import _VARIANCE_FLOOR, _boundary, _variance
+from filenamecluster.core import _VARIANCE_FLOOR, _boundary, _variance, fit
 
 class LearnTests(unittest.TestCase):
     def test_two_patterns_meet_between_their_centers(self):

@@ -3,7 +3,7 @@
 import tkinter as tk
 from unittest.mock import patch
 
-from filenamecluster.core.operations import organize
+import filenamecluster.ui.controller.relocation as relocation
 from filenamecluster.ui.view import Dialogs
 from filenamecluster.ui.view.name_clash import NameClashDialog
 from conftest import PHOTOS, WindowCase
@@ -13,14 +13,14 @@ class MoveTests(WindowCase):
     def test_apply_moves_while_the_spinner_is_showing(self):
         self.app.controller.load_folder(self.folder)
         seen: dict[str, bool] = {}
-        real = organize.move_into_cluster_folders
+        real = relocation.move_into_cluster_folders
 
         def wrapped(directory, clusters, replacing=frozenset()):
             seen["busy"] = self.app.model.busy
             return real(directory, clusters, replacing=replacing)
 
         with (
-            patch.object(organize, "move_into_cluster_folders", wrapped),
+            patch.object(relocation, "move_into_cluster_folders", wrapped),
             patch.object(Dialogs._messagebox, "askyesno", return_value=True),
             patch.object(Dialogs._messagebox, "showinfo") as info,
         ):
@@ -74,7 +74,7 @@ class MoveTests(WindowCase):
             patch.object(Dialogs._messagebox, "askyesno", return_value=True),
             patch.object(Dialogs._messagebox, "showerror") as error,
             patch.object(
-                organize, "move_into_cluster_folders", side_effect=OSError("disk full")
+                relocation, "move_into_cluster_folders", side_effect=OSError("disk full")
             ),
         ):
             self.app.controller.apply_clustering()
@@ -158,7 +158,7 @@ class MoveTests(WindowCase):
         with (
             patch.object(Dialogs._messagebox, "askyesno", return_value=True),
             patch.object(Dialogs._messagebox, "showerror") as error,
-            patch.object(organize, "flatten_cluster_folders", side_effect=OSError("busy")),
+            patch.object(relocation, "flatten_cluster_folders", side_effect=OSError("busy")),
         ):
             self.app.controller.flatten_clustering()
         error.assert_called_once()

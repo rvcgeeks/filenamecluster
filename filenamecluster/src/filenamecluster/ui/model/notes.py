@@ -12,8 +12,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from filenamecluster.core.operations import load_folder_notes
-from filenamecluster.core.parser.folders import event_folder_parts, is_cluster_folder_name, name_with_note
+from filenamecluster.core import event_folder_parts, is_cluster_folder_name, load_folder_notes, name_with_note
 from filenamecluster.log import trace_module
 from .display import ShownEvent
 

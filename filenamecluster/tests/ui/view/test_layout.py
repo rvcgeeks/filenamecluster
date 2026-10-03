@@ -3,9 +3,7 @@
 import unittest
 from datetime import datetime, timedelta
 
-from filenamecluster.core.algorithm.cluster import Cluster
-from filenamecluster.core.operations.organize import name_clusters
-from filenamecluster.core.parser import TimestampedFile
+from filenamecluster.core import Cluster, TimestampedFile, name_clusters
 from filenamecluster.ui.view import (
     MAX_WIDTH,
     MIN_BAR,

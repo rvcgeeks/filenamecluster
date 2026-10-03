@@ -3,7 +3,7 @@
 import unittest
 from pathlib import Path
 
-from filenamecluster.core.operations.placement import PlannedMove
+from filenamecluster.core import PlannedMove
 from filenamecluster.ui.controller.clashes import ClashResolver
 from filenamecluster.ui.model import ClashChoice
 

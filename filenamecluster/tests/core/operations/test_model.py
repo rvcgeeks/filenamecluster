@@ -5,13 +5,11 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.algorithm import ClusterParams, FolderModel
+from filenamecluster.core import ClusterParams, FolderModel
 
 class SavedOptionsTests(unittest.TestCase):
     def test_options_round_trip_beside_learned_without_changing_the_boundary(self):
-        from filenamecluster.core.algorithm import GapModel, ModelOptions
-        from filenamecluster.core.operations import load_model, save_model
-        from filenamecluster.core.parser import TimestampPatterns
+        from filenamecluster.core import GapModel, ModelOptions, TimestampPatterns, load_model, save_model
 
         patterns = TimestampPatterns()
         options = ModelOptions(
@@ -56,10 +54,7 @@ class SavedOptionsTests(unittest.TestCase):
             self.assertIsNone(legacy.options)
 
     def test_saved_options_override_defaults_until_the_caller_passes_params(self):
-        from filenamecluster.core.algorithm import ModelOptions
-        from filenamecluster.core.operations import load_model, save_model
-        from filenamecluster.core.parser import TimestampPatterns
-        from filenamecluster.core.operations.pipeline import cluster_directory
+        from filenamecluster.core import ModelOptions, TimestampPatterns, cluster_directory, load_model, save_model
 
         patterns = TimestampPatterns()
         options = ModelOptions(
@@ -96,16 +91,17 @@ class ChangedModelTests(unittest.TestCase):
     def test_a_close_writes_only_the_side_that_changed(self):
         from unittest.mock import patch
 
-        from filenamecluster.core.algorithm import GapModel, ModelOptions
-        from filenamecluster.core.operations import (
+        from filenamecluster.core import (
+            GapModel,
+            ModelOptions,
+            OptionReader,
+            TimestampPatterns,
             keep_folder_notes,
             load_folder_notes,
             load_model,
             save_model,
             store_if_changed,
         )
-        from filenamecluster.core.operations.options import OptionReader
-        from filenamecluster.core.parser import TimestampPatterns
 
         patterns = TimestampPatterns()
         rules = tuple((rule.key, rule.description, rule.pattern) for rule in patterns.rules)

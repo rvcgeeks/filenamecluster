@@ -2,7 +2,7 @@
 
 import unittest
 
-from filenamecluster.core.parser.folders import (
+from filenamecluster.core import (
     event_folder_parts,
     folder_note,
     is_cluster_folder_name,

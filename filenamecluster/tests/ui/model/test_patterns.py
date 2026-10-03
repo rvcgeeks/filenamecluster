@@ -2,7 +2,7 @@
 
 import unittest
 
-from filenamecluster.core.parser import TimestampPatterns
+from filenamecluster.core import TimestampPatterns
 from filenamecluster.ui.model import PatternRow
 
 

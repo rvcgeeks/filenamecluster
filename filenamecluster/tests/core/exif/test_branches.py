@@ -9,33 +9,31 @@ from unittest.mock import patch
 
 from datetime import tzinfo
 
-from filenamecluster.core.exif.image import (
+from filenamecluster.core import (
     _MAX_READ,
     _MAX_SEGMENT,
-    _jpeg_exif,
-    _jpeg_marker,
-    _png_exif,
-    _search_exif_header,
-    _webp_exif,
-)
-from filenamecluster.core.exif.pdf import _parse_pdf_date, _pdf_date_after, _pdf_timestamp
-from filenamecluster.core.exif.read import read_exif_timestamp
-from filenamecluster.core.exif.tiff import (
     _ascii_at,
-    _datetime_from_tiff,
-    _parse_clock,
-    _u16,
-    _u32,
-    _walk_ifd,
-)
-from filenamecluster.core.exif.video import (
     _avi_timestamp,
     _bmff_timestamp,
     _box_header,
+    _datetime_from_tiff,
+    _jpeg_exif,
+    _jpeg_marker,
     _mvhd_in,
     _mvhd_time,
+    _parse_clock,
     _parse_idit,
+    _parse_pdf_date,
+    _pdf_date_after,
+    _pdf_timestamp,
+    _png_exif,
+    _search_exif_header,
     _time_in_block,
+    _u16,
+    _u32,
+    _walk_ifd,
+    _webp_exif,
+    read_exif_timestamp,
 )
 
 

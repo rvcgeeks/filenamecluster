@@ -7,27 +7,31 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from filenamecluster.core.algorithm.cluster import Cluster, ClusterParams, ModelOptions
-from filenamecluster.core.operations.model import keep_rules, load_model
-from filenamecluster.core.operations.options import OptionReader, rule_error
-from filenamecluster.core.operations.organize import (
+from filenamecluster.core import (
+    Cluster,
+    ClusterParams,
+    FolderPreview,
+    ModelOptions,
+    OptionReader,
+    ScanState,
+    TimestampPatterns,
+    TimestampedFile,
+    cluster_directory,
+    commit_cluster_moves,
     event_folder,
     event_folder_names,
     find_event_folder,
     folder_note,
     is_folder,
+    keep_rules,
+    load_model,
     locate_file,
     name_clusters,
-)
-from filenamecluster.core.operations.preview import FolderPreview, ScanState
-from filenamecluster.core.operations.pipeline import (
+    _overwrite,
     _params_from_options,
     _patterns_from_options,
-    cluster_directory,
+    rule_error,
 )
-from filenamecluster.core.operations.placement import _overwrite, commit_cluster_moves
-from filenamecluster.core.parser import TimestampedFile
-from filenamecluster.core.parser.patterns import TimestampPatterns
 
 
 def _options(**changes) -> ModelOptions:

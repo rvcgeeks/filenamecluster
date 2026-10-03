@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import sys
 
-from filenamecluster.core.operations import OptionError, OptionReader, RuleLedger, rule_error, store_if_changed
+from filenamecluster.core import OptionError, OptionReader, RuleLedger, rule_error, store_if_changed
 from filenamecluster.log import event, trace_module
 
 

@@ -2,7 +2,7 @@
 
 import unittest
 
-from filenamecluster.core.operations import OptionError, OptionFault, OptionField
+from filenamecluster.core import OptionError, OptionFault, OptionField
 
 
 class OptionErrorTests(unittest.TestCase):

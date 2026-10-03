@@ -5,8 +5,9 @@ import zlib
 from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from filenamecluster.core.exif import read_exif_timestamp
+from filenamecluster.core import read_exif_timestamp
 
 WHEN = "2024:06:01 12:30:45"
 OLDER = "2010:01:01 08:00:00"
@@ -111,8 +112,6 @@ class ExifTimestampTests(unittest.TestCase):
             self.assertEqual(read_exif_timestamp(root / "split.heic"), expected)
 
     def test_a_bulky_segment_before_exif_is_skipped(self):
-        import filenamecluster.core.exif.image as image
-
         tiff = _tiff(WHEN)
         app1 = len(b"Exif\x00\x00" + tiff) + 2
         pad = b"\x00" * (app1 + 100)
@@ -120,12 +119,10 @@ class ExifTimestampTests(unittest.TestCase):
         jpeg += b"\xff\xe0" + (len(pad) + 2).to_bytes(2, "big") + pad
         payload = b"Exif\x00\x00" + tiff
         jpeg += b"\xff\xe1" + (len(payload) + 2).to_bytes(2, "big") + payload + b"\xff\xd9"
-        original = image._MAX_SEGMENT
-        image._MAX_SEGMENT = app1 + 10
-        try:
-            with TemporaryDirectory() as tmp:
-                path = Path(tmp) / "bulky.jpg"
-                path.write_bytes(jpeg)
-                self.assertEqual(read_exif_timestamp(path), datetime(2024, 6, 1, 12, 30, 45))
-        finally:
-            image._MAX_SEGMENT = original
+        with (
+            patch("filenamecluster.core.exif.image._MAX_SEGMENT", app1 + 10),
+            TemporaryDirectory() as tmp,
+        ):
+            path = Path(tmp) / "bulky.jpg"
+            path.write_bytes(jpeg)
+            self.assertEqual(read_exif_timestamp(path), datetime(2024, 6, 1, 12, 30, 45))

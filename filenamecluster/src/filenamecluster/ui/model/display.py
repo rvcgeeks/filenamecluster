@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from enum import Enum, auto
 from pathlib import Path
 
-from filenamecluster.core.operations import OptionFault, OptionField
+from filenamecluster.core import OptionFault, OptionField
 from filenamecluster.log import trace_module
 
 

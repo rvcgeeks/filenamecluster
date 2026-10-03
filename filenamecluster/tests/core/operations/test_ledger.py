@@ -2,7 +2,7 @@
 
 import json
 
-from filenamecluster.core.parser import TimestampPatterns
+from filenamecluster.core import TimestampPatterns
 from conftest import WindowCase
 
 

@@ -9,8 +9,7 @@ from __future__ import annotations
 import sys
 from datetime import timedelta
 
-from filenamecluster.core.algorithm.cluster import ClusterParams
-from filenamecluster.core.parser import LIMIT_FIELDS
+from filenamecluster.core import LIMIT_FIELDS, ClusterParams
 from filenamecluster.log import trace_module
 
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from filenamecluster.core.operations import OptionFault, OptionField
+from filenamecluster.core import OptionFault, OptionField
 from filenamecluster.log import trace_module
 from filenamecluster.ui.controller import (
     Applied,

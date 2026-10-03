@@ -5,15 +5,15 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.algorithm.cluster import Cluster
-from filenamecluster.core.operations.organize import (
+from filenamecluster.core import (
+    Cluster,
+    TimestampedFile,
     flatten_cluster_folders,
     move_into_cluster_folders,
     name_clusters,
     plan_cluster_moves,
     plan_flatten_moves,
 )
-from filenamecluster.core.parser import TimestampedFile
 
 
 def named(name: str, when: datetime):
@@ -72,7 +72,7 @@ class PlacementTests(unittest.TestCase):
             root = Path(tmp)
             (root / "IMG_20240101_100000.jpg").write_bytes(b"inside")
             (root / "IMG_20240108_090000.jpg").write_bytes(b"other")
-            from filenamecluster.core.operations.pipeline import cluster_directory
+            from filenamecluster.core import cluster_directory
 
             result = cluster_directory(root)
             move_into_cluster_folders(root, result.clusters)

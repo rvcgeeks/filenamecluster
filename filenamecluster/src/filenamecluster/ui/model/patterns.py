@@ -9,7 +9,7 @@ from __future__ import annotations
 import sys
 from typing import NamedTuple
 
-from filenamecluster.core.operations import rule_error
+from filenamecluster.core import rule_error
 from filenamecluster.log import trace_module
 
 

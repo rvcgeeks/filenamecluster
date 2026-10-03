@@ -4,7 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from filenamecluster.core.operations import OptionFault, OptionField
+from filenamecluster.core import OptionFault, OptionField
 from filenamecluster.ui.controller import ApplyCreate, PatternValid
 from filenamecluster.ui.model import ChooseStatus, OptionProblemStatus, ValueProblemStatus
 from filenamecluster.ui.view import Dialogs, t

@@ -8,9 +8,7 @@ from __future__ import annotations
 
 import sys
 
-from filenamecluster.core.operations import keep_folder_notes
-from filenamecluster.core.operations.organize import find_event_folder
-from filenamecluster.core.parser.folders import event_folder_parts, name_with_note
+from filenamecluster.core import event_folder_parts, find_event_folder, keep_folder_notes, name_with_note
 from filenamecluster.log import trace_module
 from .requests import RenameRejected
 

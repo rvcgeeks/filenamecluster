@@ -11,10 +11,16 @@ from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
-from filenamecluster.core.algorithm import ModelOptions
-from filenamecluster.core.operations import OptionError, is_cluster_folder_name, rule_error
-from filenamecluster.core.parser import LIMIT_FIELDS, TimestampPatterns, TimestampedFile
-from filenamecluster.core.operations.pipeline import ClusterResult
+from filenamecluster.core import (
+    LIMIT_FIELDS,
+    ClusterResult,
+    ModelOptions,
+    OptionError,
+    TimestampPatterns,
+    TimestampedFile,
+    is_cluster_folder_name,
+    rule_error,
+)
 from filenamecluster.log import trace_module
 from .display import (
     ChooseStatus,

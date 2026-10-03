@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 
-from filenamecluster.core.operations import organize
+from filenamecluster.core import find_event_folder, locate_file
 from filenamecluster.log import log_call, trace_module
 from .ports import DialogPort
 from .requests import FileMissing, FolderMissing
@@ -37,7 +37,7 @@ class OpenActions:
         if self._model.directory is None or found is None:
             return
         item, index = found
-        path = organize.locate_file(self._model.directory, item, self._cluster_name(index))
+        path = locate_file(self._model.directory, item, self._cluster_name(index))
         if path is None:
             self._ui.tell(FileMissing(item.name))
             return
@@ -52,7 +52,7 @@ class OpenActions:
         if not 0 <= index < len(self._model.result.clusters):
             return
         cluster = self._model.result.clusters[index]
-        folder = organize.find_event_folder(self._model.directory, cluster)
+        folder = find_event_folder(self._model.directory, cluster)
         if folder is not None:
             log_call("filenamecluster.ui.controller.files.open_folder_window")
             self._files.open_folder_window(folder)

@@ -5,9 +5,13 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.parser import PatternRule, TimestampPatterns, parse_timestamp
-from filenamecluster.core.parser.patterns import DEFAULT_RULES
-from filenamecluster.core.operations.pipeline import cluster_directory
+from filenamecluster.core import (
+    DEFAULT_RULES,
+    PatternRule,
+    TimestampPatterns,
+    cluster_directory,
+    parse_timestamp,
+)
 
 class PatternOptionTests(unittest.TestCase):
     def test_defaults_are_the_built_in_patterns(self):

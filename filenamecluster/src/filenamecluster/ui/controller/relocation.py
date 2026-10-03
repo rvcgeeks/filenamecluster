@@ -12,7 +12,16 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from filenamecluster.core.operations import organize
+from filenamecluster.core import (
+    event_folder_names,
+    flatten_cluster_folders,
+    folder_note,
+    is_cluster_folder_name,
+    is_folder,
+    move_into_cluster_folders,
+    plan_cluster_moves,
+    plan_flatten_moves,
+)
 from filenamecluster.log import event, log_call, trace_module
 from filenamecluster.ui.model import PreviewStaysStatus
 from .clashes import ClashResolver
@@ -52,11 +61,11 @@ class FolderRelocation:
         if self.model.busy:
             return
         directory = self.model.directory
-        if directory is None or not organize.is_folder(directory):
+        if directory is None or not is_folder(directory):
             return
 
         def list_folders():
-            return organize.event_folder_names(directory)
+            return event_folder_names(directory)
 
         def after_list(outcome: Success | Failure) -> None:
             if isinstance(outcome, Failure):
@@ -79,7 +88,7 @@ class FolderRelocation:
             self.ui.tell(NothingToMove())
             return
         already_clustered = any(
-            organize.is_cluster_folder_name(name) for name in result.ignored_directories
+            is_cluster_folder_name(name) for name in result.ignored_directories
         )
         question = (
             ApplyUpdate(self.model.directory, result.file_count, len(result.clusters))
@@ -119,16 +128,16 @@ class FolderRelocation:
                 directory,
                 outcome.value.clashes,
                 Wait.APPLY,
-                lambda replacing: organize.move_into_cluster_folders(
+                lambda replacing: move_into_cluster_folders(
                     directory, clusters, replacing=replacing
                 ),
                 finish,
                 "apply_cancelled",
-                "filenamecluster.core.operations.organize.move_into_cluster_folders",
+                "filenamecluster.core.move_into_cluster_folders",
             )
 
-        log_call("filenamecluster.core.operations.organize.plan_cluster_moves")
-        self.disk(Wait.NAME_CHECK, lambda: organize.plan_cluster_moves(directory, clusters), after_plan)
+        log_call("filenamecluster.core.plan_cluster_moves")
+        self.disk(Wait.NAME_CHECK, lambda: plan_cluster_moves(directory, clusters), after_plan)
 
     def _confirm_flatten(self, directory: Path, folders) -> None:
         """Ask, after the folder list, whether to move the files back."""
@@ -136,7 +145,7 @@ class FolderRelocation:
         if not folders:
             self.ui.tell(NothingToFlatten())
             return
-        noted = sum(1 for name in folders if organize.folder_note(name))
+        noted = sum(1 for name in folders if folder_note(name))
         if not self.ui.ask(FlattenAsk(len(folders), directory, noted=noted)):
             event("flatten_cancelled", path=str(directory))
             return
@@ -158,14 +167,14 @@ class FolderRelocation:
                 directory,
                 outcome.value.clashes,
                 Wait.FLATTEN,
-                lambda replacing: organize.flatten_cluster_folders(directory, replacing=replacing),
+                lambda replacing: flatten_cluster_folders(directory, replacing=replacing),
                 finish,
                 "flatten_cancelled",
-                "filenamecluster.core.operations.organize.flatten_cluster_folders",
+                "filenamecluster.core.flatten_cluster_folders",
             )
 
-        log_call("filenamecluster.core.operations.organize.plan_flatten_moves")
-        self.disk(Wait.NAME_CHECK, lambda: organize.plan_flatten_moves(directory), after_plan)
+        log_call("filenamecluster.core.plan_flatten_moves")
+        self.disk(Wait.NAME_CHECK, lambda: plan_flatten_moves(directory), after_plan)
 
     def _commit(self, directory, clashes, wait, commit, finish, cancel_name: str, call_name: str) -> None:
         """Ask about each clash, then move on the disk thread."""

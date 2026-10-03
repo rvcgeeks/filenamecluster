@@ -4,9 +4,9 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from filenamecluster.core.exif import read_exif_timestamp
-from filenamecluster.core.operations.pipeline import cluster_directory
+from filenamecluster.core import cluster_directory, read_exif_timestamp
 
 class PdfTimestampTests(unittest.TestCase):
     def test_pdf_info_and_xmp_creation_dates(self):
@@ -29,27 +29,23 @@ class PdfTimestampTests(unittest.TestCase):
                 self.assertEqual(read_exif_timestamp(root / name), expected, name)
 
     def test_pdf_creation_date_can_be_near_the_end(self):
-        import filenamecluster.core.exif.pdf as pdf
-
-        original = pdf._MAX_READ
-        pdf._MAX_READ = 64
-        try:
-            with TemporaryDirectory() as tmp:
-                path = Path(tmp) / "tail.pdf"
-                path.write_bytes(
-                    b"%PDF-1.7\n"
-                    + b"x" * 200
-                    + b"\n/CreationDate (D:20240601123045+05'30')\n%%EOF"
-                )
-                source = datetime(
-                    2024, 6, 1, 12, 30, 45, tzinfo=timezone(timedelta(hours=5, minutes=30))
-                )
-                self.assertEqual(
-                    read_exif_timestamp(path),
-                    source.astimezone().replace(tzinfo=None),
-                )
-        finally:
-            pdf._MAX_READ = original
+        with (
+            patch("filenamecluster.core.exif.pdf._MAX_READ", 64),
+            TemporaryDirectory() as tmp,
+        ):
+            path = Path(tmp) / "tail.pdf"
+            path.write_bytes(
+                b"%PDF-1.7\n"
+                + b"x" * 200
+                + b"\n/CreationDate (D:20240601123045+05'30')\n%%EOF"
+            )
+            source = datetime(
+                2024, 6, 1, 12, 30, 45, tzinfo=timezone(timedelta(hours=5, minutes=30))
+            )
+            self.assertEqual(
+                read_exif_timestamp(path),
+                source.astimezone().replace(tzinfo=None),
+            )
 
     def test_pdf_filename_wins_and_missing_metadata_is_skipped(self):
         with TemporaryDirectory() as tmp:

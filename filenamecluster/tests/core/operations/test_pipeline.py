@@ -5,10 +5,13 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.algorithm.cluster import ClusterParams
-from filenamecluster.core.operations.organize import cluster_name, move_into_cluster_folders
-from filenamecluster.core.parser import parse_timestamp
-from filenamecluster.core.operations.pipeline import cluster_directory
+from filenamecluster.core import (
+    ClusterParams,
+    cluster_directory,
+    cluster_name,
+    move_into_cluster_folders,
+    parse_timestamp,
+)
 
 
 LISTING = Path(__file__).resolve().parents[4] / "workspace" / "filenames.txt"

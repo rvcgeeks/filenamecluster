@@ -4,9 +4,7 @@ import unittest
 from dataclasses import replace
 from datetime import date, datetime, timedelta
 
-from filenamecluster.core.algorithm import Cluster
-from filenamecluster.core.operations.organize import name_clusters
-from filenamecluster.core.parser import TimestampedFile
+from filenamecluster.core import Cluster, TimestampedFile, name_clusters
 from filenamecluster.ui.model import LearnedKind, LearnedSummary, SummaryStatus, cover_days
 
 

@@ -5,10 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.algorithm.cluster import ClusterParams
-from filenamecluster.core.algorithm import GapModel
-from filenamecluster.core.operations.organize import cluster_name
-from filenamecluster.core.operations.pipeline import ClusterResult, cluster_directory
+from filenamecluster.core import ClusterParams, ClusterResult, GapModel, cluster_directory, cluster_name
 from filenamecluster.ui.model import AppModel, SkippedReason
 
 

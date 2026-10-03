@@ -11,11 +11,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from filenamecluster.core.algorithm import ModelOptions
-from filenamecluster.core.operations import (
+from filenamecluster.core import (
     CurrentPreview,
     FolderPreview,
     FolderScan,
+    ModelOptions,
     OptionError,
     OptionReader,
     SavedOptionsState,

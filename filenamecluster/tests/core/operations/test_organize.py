@@ -5,16 +5,16 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from filenamecluster.core.algorithm.cluster import Cluster
-from filenamecluster.core.operations.organize import (
+from filenamecluster.core import (
+    Cluster,
+    TimestampedFile,
+    cluster_directory,
     cluster_name,
     flatten_cluster_folders,
     is_cluster_folder_name,
     move_into_cluster_folders,
     name_clusters,
 )
-from filenamecluster.core.parser import TimestampedFile
-from filenamecluster.core.operations.pipeline import cluster_directory
 
 
 def stamp(name: str, when: datetime) -> TimestampedFile:
