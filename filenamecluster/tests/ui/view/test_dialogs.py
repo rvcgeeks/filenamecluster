@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 from filenamecluster.ui.view import Dialogs, t
+from filenamecluster.ui.view import prompt as prompt_module
 
 
 class DialogTests(unittest.TestCase):
@@ -38,3 +39,31 @@ class DialogTests(unittest.TestCase):
         boxes.showinfo.assert_called_once_with("i", "info body", parent=self.parent)
         boxes.showerror.assert_called_once_with("e", "error body", parent=self.parent)
         boxes.showwarning.assert_called_once_with("w", "warning body", parent=self.parent)
+
+    def test_apply_questions_use_the_timeout_without_opening_a_window(self):
+        with patch.object(prompt_module, "yes_no", return_value=True) as ask:
+            self.assertTrue(self.dialogs.ask_yes_no("Apply clustering", "Move the files"))
+            self.dialogs.info("Clustering applied", "Moved 1 file.", timed=True)
+        question, done = ask.call_args_list
+        self.assertEqual(question.args, (self.parent, "Apply clustering", "Move the files"))
+        self.assertEqual(question.kwargs["timeout"], prompt_module.PROMPT_TIMEOUT_SECONDS)
+        self.assertEqual(question.kwargs["ok"], t("prompt_ok"))
+        self.assertEqual(question.kwargs["cancel"], t("prompt_cancel"))
+        self.assertEqual(
+            question.kwargs["countdown"],
+            t("prompt_countdown", seconds="{seconds}"),
+        )
+        self.assertIsNone(done.kwargs["cancel"])
+        self.assertEqual(done.kwargs["timeout"], prompt_module.PROMPT_TIMEOUT_SECONDS)
+
+    def test_cancel_is_not_ok_and_the_timer_running_out_is(self):
+        self.assertFalse(prompt_module.closed_answer(t("prompt_cancel")))
+        self.assertTrue(prompt_module.closed_answer(None))
+        self.assertEqual(prompt_module.countdown_step(prompt_module.PROMPT_TIMEOUT_SECONDS), (29, False))
+        shown, expired = prompt_module.countdown_step(1)
+        self.assertEqual(shown, 0)
+        self.assertTrue(expired)
+        self.assertEqual(
+            t("prompt_countdown", seconds="{seconds}").format(seconds=prompt_module.PROMPT_TIMEOUT_SECONDS),
+            "OK in 30s",
+        )

@@ -27,6 +27,7 @@ class DiskRunner:
 
         root = self._root
         dialog = SpinnerDialog(root, self._translate(message_key))
+        root._filenamecluster_wait = dialog
         outcome_box: dict[str, object] = {}
         event("disk_work", message=message_key)
 
@@ -46,6 +47,8 @@ class DiskRunner:
             try:
                 on_done(error if error is not None else outcome_box.get("value"))
             finally:
+                if getattr(root, "_filenamecluster_wait", None) is dialog:
+                    root._filenamecluster_wait = None
                 dialog.close()
 
         threading.Thread(target=worker, name="filenamecluster-disk", daemon=True).start()

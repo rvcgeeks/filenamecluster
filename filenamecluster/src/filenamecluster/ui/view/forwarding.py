@@ -95,11 +95,11 @@ class ViewForwarding:
     def tell(self, notice: Notice) -> None:
         self.messages.present(notice)
 
-    def tell_info(self, title_key: str, body_key: str, **fields: object) -> None:
-        self.messages.tell_info(title_key, body_key, **fields)
+    def tell_info(self, title_key: str, body_key: str, *, timed: bool = False, **fields: object) -> None:
+        self.messages.tell_info(title_key, body_key, timed=timed, **fields)
 
-    def tell_error(self, title_key: str, body: str) -> None:
-        self.messages.tell_error(title_key, body)
+    def tell_error(self, title_key: str, body: str, *, timed: bool = False) -> None:
+        self.messages.tell_error(title_key, body, timed=timed)
 
     def tell_warning(self, title_key: str, body_key: str, **fields: object) -> None:
         self.messages.tell_warning(title_key, body_key, **fields)

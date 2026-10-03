@@ -1,6 +1,6 @@
 [project]
 name = "filenamecluster"
-version = "0.1.5"
+version = "0.1.54"
 description = "Tkinter app that clusters camera-roll files into chronological events using the timestamp in each filename, or picture, video, or PDF creation metadata when the name has none."
 authors = [{ name = "Rajas Chavadekar", email = "rvchavadekar@gmail.com" }]
 requires-python = ">=3.11"

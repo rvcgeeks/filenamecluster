@@ -24,6 +24,27 @@ MIN_DELAY_MS = 16
 WINDOWS_KEY = "#17324e"
 
 
+def release_wait(widget: tk.Misc) -> None:
+    """Close the spinner before a confirmation or an OK prompt.
+
+    The overlay stays up while the window paints. A question has to be readable
+    on its own, so the prompt dismisses the overlay before Tk shows it.
+    """
+
+    toplevel = getattr(widget, "winfo_toplevel", None)
+    if toplevel is None:
+        return
+    try:
+        owner = toplevel()
+    except tk.TclError:
+        return
+    dialog = getattr(owner, "_filenamecluster_wait", None)
+    if dialog is None:
+        return
+    owner._filenamecluster_wait = None
+    dialog.close()
+
+
 def spinner_path() -> Path:
     """GIF played by ``SpinnerDialog``."""
 

@@ -28,7 +28,8 @@ from .layout import (
     fit_pixels_per_day,
     layout_bars,
 )
-from .spinner import SpinnerDialog, gif_delays, gif_frames, spinner_path
+from .prompt import PROMPT_TIMEOUT_SECONDS
+from .spinner import SpinnerDialog, gif_delays, gif_frames, release_wait, spinner_path
 from .theme import backing_scale, prepare_process_dpi, use_script
 from .timeline_draw import describe_zoom
 from .view import AppView
@@ -40,6 +41,7 @@ __all__ = [
     "MIN_BAR",
     "MIN_PIXELS_PER_DAY",
     "MARGIN",
+    "PROMPT_TIMEOUT_SECONDS",
     "AppView",
     "Dialogs",
     "SpinnerDialog",
@@ -56,6 +58,7 @@ __all__ = [
     "layout_bars",
     "month_weeks",
     "prepare_process_dpi",
+    "release_wait",
     "sections",
     "shift_month",
     "spinner_path",

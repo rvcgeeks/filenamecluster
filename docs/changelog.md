@@ -4,6 +4,14 @@ Rajas Chavadekar (rvchavadekar@gmail.com)
 
 This file records user-visible changes to File Name Cluster. Versions follow semantic versioning.
 
+## 0.1.54
+
+### Changed
+
+- The package version is now `0.1.54`.
+- The wait overlay closes before a confirmation, a name-clash question, or an OK prompt, so those questions are not covered by the spinner.
+- Apply and Flatten questions, and the OK prompts that follow them, show a countdown. The wait is the assignment `PROMPT_TIMEOUT_SECONDS = 30` in `filenamecluster/src/filenamecluster/ui/view/prompt.py`. `filenamecluster.ui.view` re-exports that name. Change that one assignment to change every one of those dialogs. The label reads “OK in {seconds}s” and ticks down from that number. When it reaches zero, the dialog continues as OK. Cancel, or closing the question, still stops the move. Closing an OK-only prompt is OK. The replace-or-skip question does not use this timer.
+
 ## 0.1.5
 
 ### Added

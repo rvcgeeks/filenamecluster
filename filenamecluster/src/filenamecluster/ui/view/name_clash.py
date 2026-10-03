@@ -16,6 +16,7 @@ from tkinter import ttk
 from filenamecluster.log import trace_module
 from filenamecluster.ui.model import ClashChoice, NameClash
 from . import theme
+from .spinner import release_wait
 
 
 class NameClashDialog:
@@ -60,6 +61,7 @@ class NameClashDialog:
     def show(self) -> None:
         """Show the dialog and wait until the user chooses or closes it."""
 
+        release_wait(self.window.master)
         window = self.window
         window.update_idletasks()
         parent = window.master

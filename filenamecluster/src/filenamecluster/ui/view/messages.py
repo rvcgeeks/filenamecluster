@@ -86,7 +86,7 @@ class Messages:
         elif isinstance(notice, PatternInvalid):
             self.tell_error("pattern_invalid_title", notice.detail)
         elif isinstance(notice, NothingToMove):
-            self.tell_info("nothing_to_move_title", "nothing_to_move_body")
+            self.tell_info("nothing_to_move_title", "nothing_to_move_body", timed=True)
         elif isinstance(notice, Applied):
             if notice.skipped:
                 self.tell_info(
@@ -95,21 +95,30 @@ class Messages:
                     files=notice.files,
                     events=notice.events,
                     skipped=notice.skipped,
+                    timed=True,
                 )
             else:
                 self.tell_info(
-                    "applied_title", "applied_body", files=notice.files, events=notice.events
+                    "applied_title",
+                    "applied_body",
+                    files=notice.files,
+                    events=notice.events,
+                    timed=True,
                 )
         elif isinstance(notice, CouldNotMove):
-            self.tell_error("could_not_move", notice.detail)
+            self.tell_error("could_not_move", notice.detail, timed=True)
         elif isinstance(notice, NothingToFlatten):
-            self.tell_info("nothing_to_flatten_title", "nothing_to_flatten_body")
+            self.tell_info("nothing_to_flatten_title", "nothing_to_flatten_body", timed=True)
         elif isinstance(notice, Flattened):
             self.tell_info(
-                "flattened_title", "flattened_body", moved=notice.moved, name=notice.name
+                "flattened_title",
+                "flattened_body",
+                moved=notice.moved,
+                name=notice.name,
+                timed=True,
             )
         elif isinstance(notice, CouldNotFlatten):
-            self.tell_error("could_not_flatten", notice.detail)
+            self.tell_error("could_not_flatten", notice.detail, timed=True)
         elif isinstance(notice, FileMissing):
             self.tell_warning("file_missing_title", "file_missing_body", name=notice.name)
         elif isinstance(notice, FolderMissing):
@@ -173,14 +182,15 @@ class Messages:
             self.host.translate(body_key, **fields),
         )
 
-    def tell_info(self, title_key: str, body_key: str, **fields: object) -> None:
+    def tell_info(self, title_key: str, body_key: str, *, timed: bool = False, **fields: object) -> None:
         self.host.dialogs.info(
             self.host.translate(title_key),
             self.host.translate(body_key, **fields),
+            timed=timed,
         )
 
-    def tell_error(self, title_key: str, body: str) -> None:
-        self.host.dialogs.error(self.host.translate(title_key), body)
+    def tell_error(self, title_key: str, body: str, *, timed: bool = False) -> None:
+        self.host.dialogs.error(self.host.translate(title_key), body, timed=timed)
 
     def tell_warning(self, title_key: str, body_key: str, **fields: object) -> None:
         self.host.dialogs.warning(
