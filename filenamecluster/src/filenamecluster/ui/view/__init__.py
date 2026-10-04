@@ -28,8 +28,8 @@ from .layout import (
     fit_pixels_per_day,
     layout_bars,
 )
+from .progress_bar import ProgressDialog, bar_span, release_wait
 from .prompt import PROMPT_TIMEOUT_SECONDS
-from .spinner import SpinnerDialog, gif_delays, gif_frames, release_wait, spinner_path
 from .theme import backing_scale, prepare_process_dpi, use_script
 from .timeline_draw import describe_zoom
 from .view import AppView
@@ -43,25 +43,23 @@ __all__ = [
     "MARGIN",
     "PROMPT_TIMEOUT_SECONDS",
     "AppView",
+    "ProgressDialog",
     "Dialogs",
-    "SpinnerDialog",
     "TimeScale",
     "axis_ticks",
     "backing_scale",
+    "bar_span",
     "describe_model",
     "describe_zoom",
     "file_count",
     "file_marks",
     "fit_pixels_per_day",
-    "gif_delays",
-    "gif_frames",
     "layout_bars",
     "month_weeks",
     "prepare_process_dpi",
     "release_wait",
     "sections",
     "shift_month",
-    "spinner_path",
     "t",
     "use_script",
 ]

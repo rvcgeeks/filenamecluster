@@ -67,3 +67,15 @@ class DialogTests(unittest.TestCase):
             t("prompt_countdown", seconds="{seconds}").format(seconds=prompt_module.PROMPT_TIMEOUT_SECONDS),
             "OK in 30s",
         )
+
+    def test_a_separate_input_asks_move_or_copy_without_opening_a_window(self):
+        with patch.object(prompt_module, "choose", return_value="copy") as choose:
+            self.assertEqual(self.dialogs.ask_transfer("Title", "Body"), "copy")
+        self.assertEqual(choose.call_args.args[:3], (self.parent, "Title", "Body"))
+        self.assertEqual(choose.call_args.kwargs["default"], "move")
+        self.assertEqual(choose.call_args.kwargs["timeout"], prompt_module.PROMPT_TIMEOUT_SECONDS)
+        self.assertEqual(
+            [key for key, _label in choose.call_args.kwargs["options"]],
+            ["move", "copy"],
+        )
+        self.assertEqual(prompt_module.timeout_pick("move"), "move")

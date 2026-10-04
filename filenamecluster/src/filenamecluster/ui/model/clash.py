@@ -36,6 +36,7 @@ class NameClash:
     choice: ClashChoice | None = None
     for_all: bool = False
     cancelled: bool = False
+    discard: bool = False
 
 
 trace_module(sys.modules[__name__])

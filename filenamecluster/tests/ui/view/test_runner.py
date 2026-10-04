@@ -1,11 +1,11 @@
-"""DiskRunner spins and delivers work; AppModel owns the input lock."""
+"""DiskRunner shows progress and delivers work; AppModel owns the input lock."""
 
 import threading
 import time
 from unittest.mock import patch
 
 from filenamecluster.ui.controller import Wait
-from filenamecluster.ui.view import SpinnerDialog, release_wait
+from filenamecluster.ui.view import ProgressDialog, release_wait
 from conftest import WindowCase
 
 
@@ -18,7 +18,7 @@ class RunnerTests(WindowCase):
         del self.app.view.run_work
 
     def run_visible(self, work):
-        """Start ``work`` under the spinner and run the scheduled polls by hand."""
+        """Start ``work`` under the progress bar and run the scheduled polls by hand."""
 
         view = self.app.view
         delivered, scheduled = [], []
@@ -28,8 +28,9 @@ class RunnerTests(WindowCase):
             self.app.model.set_busy(False)
             delivered.append(outcome)
 
-        with patch.object(SpinnerDialog, "__init__", return_value=None), \
-                patch.object(SpinnerDialog, "close") as close, \
+        with patch.object(ProgressDialog, "__init__", return_value=None), \
+                patch.object(ProgressDialog, "show"), \
+                patch.object(ProgressDialog, "close") as close, \
                 patch.object(self.root, "after", side_effect=lambda _ms, fn: scheduled.append(fn)):
             view.run_work(Wait.OPEN, work, done)
             self.assertIn("disabled", view.apply_button.state())
@@ -51,7 +52,7 @@ class RunnerTests(WindowCase):
         self.assertEqual(self.run_visible(work), [42])
         self.assertEqual(names, ["filenamecluster-disk"])
 
-    def test_a_prompt_hides_the_spinner_before_the_prompt_returns(self):
+    def test_a_prompt_hides_the_progress_bar_before_the_prompt_returns(self):
         delivered = []
         scheduled = []
 
@@ -61,8 +62,9 @@ class RunnerTests(WindowCase):
             self.app.model.set_busy(False)
 
         self.app.model.set_busy(True)
-        with patch.object(SpinnerDialog, "__init__", return_value=None), \
-                patch.object(SpinnerDialog, "close") as close, \
+        with patch.object(ProgressDialog, "__init__", return_value=None), \
+                patch.object(ProgressDialog, "show"), \
+                patch.object(ProgressDialog, "close") as close, \
                 patch.object(self.root, "after", side_effect=lambda _ms, fn: scheduled.append(fn)):
             self.app.view.run_work(Wait.OPEN, lambda: None, prompted)
             deadline = time.monotonic() + 5

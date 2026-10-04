@@ -24,8 +24,11 @@ class ClashResolver:
     def __init__(self, ui: DialogPort) -> None:
         self.ui = ui
 
-    def replacing(self, clashes: Sequence) -> frozenset[Path] | None:
-        """Source paths that may overwrite. ``None`` means the user closed the dialog."""
+    def replacing(self, clashes: Sequence, *, discard: bool = False) -> frozenset[Path] | None:
+        """Source paths that may overwrite. ``None`` means the user closed the dialog.
+
+        ``discard`` asks the window to delete a skipped source instead of leaving it.
+        """
 
         if not clashes:
             return frozenset()
@@ -34,7 +37,7 @@ class ClashResolver:
         remaining = len(clashes)
         for item in clashes:
             if forced is None:
-                prompt = NameClash(name=item.target.name, count=remaining)
+                prompt = NameClash(name=item.target.name, count=remaining, discard=discard)
                 self.ui.resolve_clash(prompt)
                 if prompt.cancelled or prompt.choice is None:
                     event("name_clash_cancelled", name=item.target.name)

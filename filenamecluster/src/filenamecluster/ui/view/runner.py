@@ -1,4 +1,4 @@
-"""Spinner and background thread for a folder read or a file move.
+"""Progress bar and background thread for a folder read or a file move.
 
 Author: Rajas Chavadekar (rvchavadekar@gmail.com).
 Design: ``docs/architecture.md``.
@@ -11,12 +11,13 @@ import threading
 import tkinter as tk
 from collections.abc import Callable
 
+from filenamecluster.core.progress import Meter, bind
 from filenamecluster.log import event, trace_module
-from .spinner import SpinnerDialog
+from .progress_bar import ProgressDialog
 
 
 class DiskRunner:
-    """Play the spinner and run work off the UI thread."""
+    """Show the progress bar and run work off the UI thread."""
 
     def __init__(self, root: tk.Misc, translate: Callable[..., str]) -> None:
         self._root = root
@@ -26,12 +27,14 @@ class DiskRunner:
         """Start ``work`` on ``filenamecluster-disk`` and deliver the result on the UI thread."""
 
         root = self._root
-        dialog = SpinnerDialog(root, self._translate(message_key))
+        dialog = ProgressDialog(root, self._translate(message_key))
         root._filenamecluster_wait = dialog
+        meter = Meter()
         outcome_box: dict[str, object] = {}
         event("disk_work", message=message_key)
 
         def worker() -> None:
+            bind(meter)
             try:
                 outcome_box["value"] = work()
             except Exception as exc:
@@ -40,6 +43,8 @@ class DiskRunner:
                 outcome_box["done"] = True
 
         def poll() -> None:
+            if getattr(root, "_filenamecluster_wait", None) is dialog:
+                dialog.show(*meter.read())
             if not outcome_box.get("done"):
                 root.after(50, poll)
                 return

@@ -13,7 +13,7 @@ from typing import Protocol, runtime_checkable
 
 from filenamecluster.log import trace_module
 from filenamecluster.ui.model import NameClash
-from .requests import Notice, Question, Wait
+from .requests import Notice, Question, Transfer, Wait
 
 
 @runtime_checkable
@@ -25,6 +25,9 @@ class DialogPort(Protocol):
 
     def ask(self, question: Question) -> bool:
         """Ask a yes or no question."""
+
+    def ask_transfer(self, question: Question) -> Transfer | None:
+        """Ask whether to move or copy. ``None`` means the user cancelled."""
 
     def resolve_clash(self, clash: NameClash) -> None:
         """Ask whether to replace or skip one filename. The view writes the choice."""
@@ -43,7 +46,7 @@ class TaskRunnerPort(Protocol):
     """Run one task while the view presents its progress."""
 
     def run_work(self, wait: Wait, work, on_done) -> None:
-        """Run disk work under the spinner."""
+        """Run disk work under the progress bar."""
 
 
 class ViewPort(DialogPort, FolderPickerPort, TaskRunnerPort, Protocol):

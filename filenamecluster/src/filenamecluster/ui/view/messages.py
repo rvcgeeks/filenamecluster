@@ -24,6 +24,7 @@ from filenamecluster.ui.controller import (
     NothingToFlatten,
     RenameRejected,
     StorageRequired,
+    Transfer,
     NothingToMove,
     PatternBlank,
     PatternInvalid,
@@ -88,7 +89,16 @@ class Messages:
         elif isinstance(notice, NothingToMove):
             self.tell_info("nothing_to_move_title", "nothing_to_move_body", timed=True)
         elif isinstance(notice, Applied):
-            if notice.skipped:
+            if notice.deleted:
+                self.tell_info(
+                    "applied_title",
+                    "applied_body_deleted",
+                    files=notice.files,
+                    events=notice.events,
+                    deleted=notice.deleted,
+                    timed=True,
+                )
+            elif notice.skipped:
                 self.tell_info(
                     "applied_title",
                     "applied_body_skipped",
@@ -157,6 +167,31 @@ class Messages:
             )
         raise TypeError(f"unknown question {type(asked).__name__}")
 
+    def transfer(self, asked) -> Transfer | None:
+        """Move, copy, or cancel. The timer running out is Move."""
+
+        if isinstance(asked, ApplyCreate):
+            body = "apply_create_transfer"
+        elif isinstance(asked, ApplyUpdate):
+            body = "apply_update_transfer"
+        else:
+            raise TypeError(f"unknown transfer {type(asked).__name__}")
+        chosen = self.host.dialogs.ask_transfer(
+            self.host.translate("apply"),
+            self.host.translate(
+                body,
+                path=asked.path,
+                files=asked.files,
+                events=asked.events,
+                source=asked.source,
+            ),
+        )
+        if chosen == "move":
+            return Transfer.MOVE
+        if chosen == "copy":
+            return Transfer.COPY
+        return None
+
     def wait_key(self, wait: Wait) -> str:
         return _WAITS[wait]
 
@@ -167,12 +202,14 @@ class Messages:
         """Translate one destination-name clash and let the dialog write the choice."""
 
         everyone = self.host.translate("clash_all", count=clash.count) if clash.count > 1 else None
+        title = "clash_title_delete" if clash.discard else "clash_title"
+        skip = "clash_delete" if clash.discard else "clash_skip"
         self.host.dialogs.ask_name_clash(
             clash,
-            title=self.host.translate("clash_title"),
+            title=self.host.translate(title),
             body=self.host.translate("clash_body", name=clash.name),
             replace=self.host.translate("clash_replace"),
-            skip=self.host.translate("clash_skip"),
+            skip=self.host.translate(skip),
             everyone=everyone,
         )
 

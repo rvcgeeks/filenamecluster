@@ -32,6 +32,12 @@ def closed_answer(cancel: str | None) -> bool:
     return cancel is None
 
 
+def timeout_pick(default: str) -> str:
+    """The timer running out chooses the default action. Move is that default."""
+
+    return default
+
+
 def yes_no(
     parent: tk.Misc,
     title: str,
@@ -105,6 +111,81 @@ def yes_no(
     window.after(1000, tick)
     window.wait_window()
     return answered["ok"]
+
+
+def choose(
+    parent: tk.Misc,
+    title: str,
+    body: str,
+    *,
+    options: tuple[tuple[str, str], ...],
+    cancel: str,
+    countdown: str,
+    timeout: int,
+    default: str,
+) -> str | None:
+    """Wait for one labeled action. The timer running out returns ``default``.
+
+    Closing the window returns ``None``. ``options`` are ``(key, label)`` pairs.
+    """
+
+    answered: dict[str, str | None] = {"value": None}
+    window = tk.Toplevel(parent)
+    window.title(title)
+    window.withdraw()
+    window.transient(parent)
+    window.resizable(False, False)
+    window.configure(background=theme.BACKGROUND)
+    left = max(int(timeout), 0)
+
+    def finish(value: str | None) -> None:
+        answered["value"] = value
+        try:
+            window.destroy()
+        except tk.TclError:
+            pass
+
+    window.protocol("WM_DELETE_WINDOW", lambda: finish(None))
+    frame = ttk.Frame(window, padding=theme.px(16))
+    frame.pack(fill="both", expand=True)
+    ttk.Label(frame, text=body, wraplength=theme.px(420), justify="left").pack(anchor="w")
+    timer = ttk.Label(frame, text=countdown.format(seconds=left))
+    timer.pack(anchor="w", pady=(theme.px(12), theme.px(12)))
+    buttons = ttk.Frame(frame)
+    buttons.pack(fill="x")
+    for key, label in options:
+        ttk.Button(buttons, text=label, command=lambda chosen=key: finish(chosen)).pack(
+            side="left", padx=(0, theme.px(8))
+        )
+    ttk.Button(buttons, text=cancel, command=lambda: finish(None)).pack(side="left")
+
+    def tick() -> None:
+        nonlocal left
+        if not window.winfo_exists():
+            return
+        left, expired = countdown_step(left)
+        if expired:
+            finish(timeout_pick(default))
+            return
+        timer.configure(text=countdown.format(seconds=left))
+        window.after(1000, tick)
+
+    if left <= 0:
+        finish(timeout_pick(default))
+        return answered["value"]
+    window.update_idletasks()
+    width = window.winfo_reqwidth()
+    height = window.winfo_reqheight()
+    x = parent.winfo_rootx() + max(0, (parent.winfo_width() - width) // 2)
+    y = parent.winfo_rooty() + max(0, (parent.winfo_height() - height) // 2)
+    window.geometry(f"+{x}+{y}")
+    window.deiconify()
+    window.lift()
+    window.focus_set()
+    window.grab_set()
+    window.after(1000, tick)
+    window.wait_window()
+    return answered["value"]
 
 
 trace_module(sys.modules[__name__])

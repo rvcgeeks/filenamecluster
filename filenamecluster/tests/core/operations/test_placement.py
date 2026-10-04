@@ -68,6 +68,31 @@ class PlacementTests(unittest.TestCase):
             self.assertTrue((root / "a.jpg").is_file())
             self.assertFalse((root / "b.jpg").exists())
 
+    def test_skip_deletes_the_source_when_the_folders_are_the_same(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "a.jpg").write_bytes(b"loose")
+            clusters = named("a.jpg", datetime(2024, 1, 1, 10, 0, 0))
+            folder = root / clusters[0].name
+            folder.mkdir()
+            (folder / "a.jpg").write_bytes(b"kept")
+            move_into_cluster_folders(root, clusters, replacing=(), delete_skipped=True)
+            self.assertFalse((root / "a.jpg").exists())
+            self.assertEqual((folder / "a.jpg").read_bytes(), b"kept")
+
+    def test_copy_leaves_the_input_file_and_writes_the_event_folder(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            incoming = root / "camera"
+            incoming.mkdir()
+            (incoming / "a.jpg").write_bytes(b"camera")
+            clusters = name_clusters(
+                [Cluster((TimestampedFile("a.jpg", datetime(2024, 1, 1, 10, 0, 0), origin="input"),))]
+            )
+            move_into_cluster_folders(root, clusters, replacing=(), source=incoming, copying=True)
+            self.assertEqual((incoming / "a.jpg").read_bytes(), b"camera")
+            self.assertEqual((root / clusters[0].name / "a.jpg").read_bytes(), b"camera")
+
     def test_flatten_replace_and_skip(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

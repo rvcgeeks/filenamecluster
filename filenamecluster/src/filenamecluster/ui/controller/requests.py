@@ -17,6 +17,13 @@ from filenamecluster.log import trace_module
 T = TypeVar("T")
 
 
+class Transfer(Enum):
+    """How files leave a separate input folder."""
+
+    MOVE = auto()
+    COPY = auto()
+
+
 class Wait(Enum):
     """Why the window is waiting on disk work."""
 
@@ -70,6 +77,7 @@ class Applied:
     files: int
     events: int
     skipped: int = 0
+    deleted: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +130,7 @@ class ApplyCreate:
     path: Path
     files: int
     events: int
+    source: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +138,7 @@ class ApplyUpdate:
     path: Path
     files: int
     events: int
+    source: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)

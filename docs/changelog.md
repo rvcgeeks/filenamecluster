@@ -4,6 +4,18 @@ Rajas Chavadekar (rvchavadekar@gmail.com)
 
 This file records user-visible changes to File Name Cluster. Versions follow semantic versioning.
 
+## 0.1.6
+
+### Added
+
+- The package version is now `0.1.6`.
+- When the input folder is a different folder from storage, **Apply clustering** asks whether to move or copy. **Move from source** removes each input file from the input folder. **Copy from source** leaves it there and also puts it in the event folder. The countdown says “Move in {seconds}s”, and the timer running out chooses Move. Cancel moves nothing. Files that already sit in the storage folder are still moved into their event folders.
+- Every folder read and every file move shows a progress bar. The window is `ProgressDialog` in `filenamecluster/src/filenamecluster/ui/view/progress_bar.py`. The count is `Meter` in `filenamecluster/src/filenamecluster/core/progress.py`. Until a job reports how many files it will handle, the bar moves without a fraction. A scan or a move then fills the bar as each file is handled. The wait animation and `spinner.gif` are removed.
+
+### Changed
+
+- When the input folder is the storage folder, a filename the destination already has offers **Delete from source** instead of **Skip this file**. Choosing it deletes the file that would have stayed unclustered. The file already in the destination stays. Flatten uses the same question. Replace still overwrites the destination. Closing the dialog still moves nothing.
+
 ## 0.1.5
 
 ### Added

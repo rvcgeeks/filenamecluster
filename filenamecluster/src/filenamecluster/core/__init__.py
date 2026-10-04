@@ -96,6 +96,7 @@ from filenamecluster.core.operations import (
     store_if_changed,
     survey_flatten,
 )
+from filenamecluster.core.progress import Meter, bind, expect, tick, unbind
 from filenamecluster.core.parser import (
     DEFAULT_RULES,
     LIMIT_FIELDS,
@@ -148,6 +149,11 @@ __all__ = [
     "_walk_ifd",
     "_webp_exif",
     "LIMIT_FIELDS",
+    "Meter",
+    "bind",
+    "expect",
+    "tick",
+    "unbind",
     "MODEL_NAME",
     "Cluster",
     "ClusterParams",

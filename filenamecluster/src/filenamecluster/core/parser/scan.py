@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from filenamecluster.core.progress import expect, tick
 from filenamecluster.log import detail, trace_module
 from .folders import is_cluster_folder_name
 from .patterns import CompiledTimestampPatterns, TimestampPatterns
@@ -63,7 +64,10 @@ def scan_directory(directory: Path) -> FolderContents:
     files: list[str] = []
     directories: list[str] = []
     placed: list[tuple[str, str]] = []
-    for entry in sorted(folder.iterdir(), key=lambda item: item.name):
+    entries = sorted(folder.iterdir(), key=lambda item: item.name)
+    expect(len(entries))
+    for entry in entries:
+        tick()
         if entry.is_dir():
             directories.append(entry.name)
             if is_cluster_folder_name(entry.name):

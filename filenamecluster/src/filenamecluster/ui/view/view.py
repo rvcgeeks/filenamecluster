@@ -176,7 +176,7 @@ class AppView(ViewForwarding):
             self.unlock_inputs()
 
     def run_work(self, wait: Wait, work, on_done) -> None:
-        """Run disk work under the spinner. Tests may replace this method."""
+        """Run disk work under the progress bar. Tests may replace this method."""
 
         self.runner.start(self.messages.wait_key(wait), work, on_done)
 

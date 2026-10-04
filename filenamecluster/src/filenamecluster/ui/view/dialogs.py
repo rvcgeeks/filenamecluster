@@ -17,7 +17,7 @@ from filenamecluster.log import log_call, trace_module
 from filenamecluster.ui.model import NameClash
 from . import prompt
 from .name_clash import NameClashDialog
-from .spinner import release_wait
+from .progress_bar import release_wait
 
 _ASK_YES_NO = messagebox.askyesno
 _SHOW_INFO = messagebox.showinfo
@@ -87,6 +87,24 @@ class Dialogs:
             cancel=self._translate("prompt_cancel"),
             countdown=self._translate("prompt_countdown", seconds="{seconds}"),
             timeout=prompt.PROMPT_TIMEOUT_SECONDS,
+        )
+
+    def ask_transfer(self, title: str, body: str) -> str | None:
+        """Move, copy, or cancel. The timer running out is move. No window in tests that patch ``choose``."""
+
+        release_wait(self._parent)
+        return prompt.choose(
+            self._parent,
+            title,
+            body,
+            options=(
+                ("move", self._translate("transfer_move")),
+                ("copy", self._translate("transfer_copy")),
+            ),
+            cancel=self._translate("prompt_cancel"),
+            countdown=self._translate("transfer_countdown", seconds="{seconds}"),
+            timeout=prompt.PROMPT_TIMEOUT_SECONDS,
+            default="move",
         )
 
     def info(self, title: str, body: str, *, timed: bool = False) -> None:

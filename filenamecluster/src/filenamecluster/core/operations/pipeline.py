@@ -157,7 +157,11 @@ def cluster_directory(
 def _collect(root: Path, contents, origin: str, compiled, stamped: list, ignored: list) -> None:
     """Read a capture time for every listed file under ``root``."""
 
+    from filenamecluster.core.progress import expect, tick
+
+    expect(len(contents.files) + len(contents.placed))
     for name in contents.files:
+        tick()
         label = name if origin == "" else f"{root.name}/{name}"
         stamp = _capture_time(root / name, name, compiled)
         if stamp is None:
@@ -167,6 +171,7 @@ def _collect(root: Path, contents, origin: str, compiled, stamped: list, ignored
         stamped.append(TimestampedFile(name, stamp, origin=origin))
         detail("capture_read", name=label, stamp=stamp.isoformat(sep=" "), source="loose")
     for dirname, name in contents.placed:
+        tick()
         placed_name = f"{dirname}/{name}"
         label = placed_name if origin == "" else f"{root.name}/{placed_name}"
         stamp = _capture_time(root / dirname / name, name, compiled)

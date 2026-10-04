@@ -1,6 +1,8 @@
 """FolderRelocation: Apply and Flatten, their confirmations, and the files on disk."""
 
 import tkinter as tk
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import filenamecluster.ui.controller.relocation as relocation
@@ -10,14 +12,21 @@ from conftest import PHOTOS, WindowCase
 
 
 class MoveTests(WindowCase):
-    def test_apply_moves_while_the_spinner_is_showing(self):
+    def test_apply_moves_while_the_progress_bar_is_showing(self):
         self.app.controller.load_folder(self.folder)
         seen: dict[str, bool] = {}
         real = relocation.move_into_cluster_folders
 
-        def wrapped(directory, clusters, replacing=frozenset(), source=None):
+        def wrapped(directory, clusters, replacing=frozenset(), source=None, copying=False, delete_skipped=False):
             seen["busy"] = self.app.model.busy
-            return real(directory, clusters, replacing=replacing, source=source)
+            return real(
+                directory,
+                clusters,
+                replacing=replacing,
+                source=source,
+                copying=copying,
+                delete_skipped=delete_skipped,
+            )
 
         with (
             patch.object(relocation, "move_into_cluster_folders", wrapped),
@@ -177,16 +186,22 @@ class MoveTests(WindowCase):
     def test_apply_replaces_or_skips_a_name_the_event_folder_already_has(self):
         self._apply()
         placed = self._copy_back("new-photo")
+
+        def delete(dialog):
+            self.assertTrue(dialog.clash.discard)
+            dialog.choose_skip()
+
         with (
-            self._choose(lambda dialog: dialog.choose_skip()),
+            self._choose(delete),
             patch.object(Dialogs._messagebox, "askyesno", return_value=True),
             patch.object(Dialogs._messagebox, "showinfo") as info,
         ):
             self.app.controller.apply_clustering()
-        self.assertIn("Left", info.call_args.args[1])
+        self.assertIn("Deleted", info.call_args.args[1])
         self.assertEqual(placed.read_bytes(), b"x")
-        self.assertEqual((self.folder / placed.name).read_bytes(), b"new-photo")
+        self.assertFalse((self.folder / placed.name).exists())
 
+        self._copy_back("new-photo", placed.name)
         with (
             self._choose(lambda dialog: dialog.choose_replace()),
             patch.object(Dialogs._messagebox, "askyesno", return_value=True),
@@ -230,21 +245,56 @@ class MoveTests(WindowCase):
     def test_flatten_replaces_or_skips_a_name_already_in_the_folder(self):
         self._apply()
         placed = self._copy_back("outside")
-        inside = placed.read_bytes()
         with self._choose(lambda dialog: dialog.choose_skip()), patch.object(
             Dialogs._messagebox, "askyesno", return_value=True
         ), patch.object(Dialogs._messagebox, "showinfo"):
             self.app.controller.flatten_clustering()
         self.assertEqual((self.folder / placed.name).read_bytes(), b"outside")
-        self.assertEqual(placed.read_bytes(), inside)
-        self.assertTrue(placed.parent.is_dir())
+        self.assertFalse(placed.exists())
 
+        self._apply()
+        placed = self._copy_back("outside")
+        inside = placed.read_bytes()
         with self._choose(lambda dialog: dialog.choose_replace()), patch.object(
             Dialogs._messagebox, "askyesno", return_value=True
         ), patch.object(Dialogs._messagebox, "showinfo"):
             self.app.controller.flatten_clustering()
         self.assertEqual((self.folder / placed.name).read_bytes(), inside)
         self.assertFalse(placed.exists())
+
+    def test_a_separate_input_asks_whether_to_move_or_copy(self):
+        self.app.controller.load_folder(self.folder)
+        name = "IMG_20240201_120000.jpg"
+        with TemporaryDirectory() as tmp:
+            incoming = Path(tmp)
+            (incoming / name).write_bytes(b"camera")
+            with patch.object(Dialogs._filedialog, "askdirectory", return_value=str(incoming)):
+                self.app.controller.choose_input()
+            with (
+                patch("filenamecluster.ui.view.dialogs.prompt.choose", return_value="copy") as choose,
+                patch.object(Dialogs._messagebox, "showinfo"),
+            ):
+                self.app.controller.apply_clustering()
+            choose.assert_called()
+            self.assertEqual((incoming / name).read_bytes(), b"camera")
+            self.assertFalse((self.folder / PHOTOS[0]).is_file())
+            copied = next(path for path in self.folder.rglob(name) if path.parent != incoming)
+            self.assertEqual(copied.read_bytes(), b"camera")
+
+        moved_name = "IMG_20240301_130000.jpg"
+        with TemporaryDirectory() as tmp:
+            incoming = Path(tmp)
+            (incoming / moved_name).write_bytes(b"later")
+            with patch.object(Dialogs._filedialog, "askdirectory", return_value=str(incoming)):
+                self.app.controller.choose_input()
+            with (
+                patch("filenamecluster.ui.view.dialogs.prompt.choose", return_value="move"),
+                patch.object(Dialogs._messagebox, "showinfo"),
+            ):
+                self.app.controller.apply_clustering()
+            self.assertFalse((incoming / moved_name).exists())
+            moved = next(self.folder.rglob(moved_name))
+            self.assertEqual(moved.read_bytes(), b"later")
 
     def _apply(self) -> None:
         self.app.controller.load_folder(self.folder)

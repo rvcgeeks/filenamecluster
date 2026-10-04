@@ -37,6 +37,7 @@ from .requests import (
     NothingToFlatten,
     NothingToMove,
     Success,
+    Transfer,
     Wait,
 )
 
@@ -87,19 +88,28 @@ class FolderRelocation:
         if not result.clusters:
             self.ui.tell(NothingToMove())
             return
+        directory = self.model.directory
+        source = self.model.input_directory
         already_clustered = any(
             is_cluster_folder_name(name) for name in result.ignored_directories
         )
         question = (
-            ApplyUpdate(self.model.directory, result.file_count, len(result.clusters))
+            ApplyUpdate(directory, result.file_count, len(result.clusters), source)
             if already_clustered
-            else ApplyCreate(self.model.directory, result.file_count, len(result.clusters))
+            else ApplyCreate(directory, result.file_count, len(result.clusters), source)
         )
-        if not self.ui.ask(question):
-            event("apply_cancelled", path=str(self.model.directory))
-            return
-        directory = self.model.directory
-        source = self.model.input_directory
+        if source is None:
+            if not self.ui.ask(question):
+                event("apply_cancelled", path=str(directory))
+                return
+            copying = False
+        else:
+            choice = self.ui.ask_transfer(question)
+            if choice is None:
+                event("apply_cancelled", path=str(directory))
+                return
+            copying = choice is Transfer.COPY
+        discard = source is None
         clusters = result.clusters
         files, events = result.file_count, len(result.clusters)
 
@@ -108,6 +118,11 @@ class FolderRelocation:
                 self._failed(outcome, directory, CouldNotMove, "apply_failed")
                 return
             kept = files - skipped
+            if skipped and discard:
+                self.ui.tell(Applied(kept, events, deleted=skipped))
+                event("apply_finished", path=str(directory), files=kept, events=events, deleted=skipped)
+                self.refresh(wait=Wait.PREVIEW)
+                return
             if skipped:
                 self.ui.tell(Applied(kept, events, skipped=skipped))
                 event("apply_finished", path=str(directory), files=kept, events=events, skipped=skipped)
@@ -130,11 +145,17 @@ class FolderRelocation:
                 outcome.value.clashes,
                 Wait.APPLY,
                 lambda replacing: move_into_cluster_folders(
-                    directory, clusters, replacing=replacing, source=source
+                    directory,
+                    clusters,
+                    replacing=replacing,
+                    source=source,
+                    copying=copying,
+                    delete_skipped=discard,
                 ),
                 finish,
                 "apply_cancelled",
                 "filenamecluster.core.move_into_cluster_folders",
+                discard=discard,
             )
 
         log_call("filenamecluster.core.plan_cluster_moves")
@@ -160,20 +181,35 @@ class FolderRelocation:
             event("flatten_finished", path=str(directory), moved=moved)
             self.refresh(wait=Wait.AFTER_FLATTEN)
 
+        discard = self.model.input_directory is None
         self._commit(
             directory,
             plan.clashes,
             Wait.FLATTEN,
-            lambda replacing: flatten_cluster_folders(directory, replacing=replacing, plan=plan),
+            lambda replacing: flatten_cluster_folders(
+                directory, replacing=replacing, plan=plan, delete_skipped=discard
+            ),
             finish,
             "flatten_cancelled",
             "filenamecluster.core.flatten_cluster_folders",
+            discard=discard,
         )
 
-    def _commit(self, directory, clashes, wait, commit, finish, cancel_name: str, call_name: str) -> None:
+    def _commit(
+        self,
+        directory,
+        clashes,
+        wait,
+        commit,
+        finish,
+        cancel_name: str,
+        call_name: str,
+        *,
+        discard: bool = False,
+    ) -> None:
         """Ask about each clash, then move on the disk thread."""
 
-        replacing = self._clashes.replacing(clashes)
+        replacing = self._clashes.replacing(clashes, discard=discard)
         if replacing is None:
             event(cancel_name, path=str(directory))
             return

@@ -16,7 +16,7 @@ from tkinter import ttk
 from filenamecluster.log import trace_module
 from filenamecluster.ui.model import ClashChoice, NameClash
 from . import theme
-from .spinner import release_wait
+from .progress_bar import release_wait
 
 
 class NameClashDialog:

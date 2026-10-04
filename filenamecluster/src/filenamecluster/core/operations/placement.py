@@ -17,6 +17,7 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
 
+from filenamecluster.core.progress import expect, tick
 from filenamecluster.log import detail, trace_module
 
 
@@ -44,6 +45,7 @@ def plan_cluster_moves(root: Path | str, clusters, source: Path | str | None = N
     moves: list[PlannedMove] = []
     clashes: list[PlannedMove] = []
     claimed: set[Path] = set()
+    expect(sum(len(cluster.files) for cluster in clusters))
     for cluster in clusters:
         folder = directory / cluster.name
         for item in cluster.files:
@@ -75,16 +77,24 @@ def commit_cluster_moves(
     clusters,
     replacing: Collection[Path],
     source: Path | str | None = None,
+    *,
+    copying: bool = False,
+    delete_skipped: bool = False,
 ) -> list[Path]:
-    """Create the event folders and move. Sources in ``replacing`` overwrite."""
+    """Create the event folders and move or copy. Sources in ``replacing`` overwrite.
+
+    ``copying`` leaves each source file in place. ``delete_skipped`` removes a
+    source whose destination name is already taken and was not chosen for replace.
+    """
 
     filing = _filing()
     directory = _directory(root)
-    detail("move_started", path=str(directory), events=len(clusters))
+    detail("move_started", path=str(directory), events=len(clusters), copying=copying)
     allowed = _resolved(replacing)
     created: list[Path] = []
     kept: set[Path] = set()
     claimed: set[Path] = set()
+    expect(sum(len(cluster.files) for cluster in clusters))
     for cluster in clusters:
         folder = directory / cluster.name
         folder.mkdir(exist_ok=True)
@@ -97,14 +107,32 @@ def commit_cluster_moves(
             if not found.is_file():
                 detail("move_missing", source=str(found))
                 raise FileNotFoundError(found)
-            _place(found, folder / filename, allowed, claimed)
+            file_copy = copying and getattr(item, "origin", "") == "input"
+            _place(
+                found,
+                folder / filename,
+                allowed,
+                claimed,
+                copying=file_copy,
+                delete_skipped=delete_skipped,
+            )
     filing._remove_empty_event_folders(directory, kept)
     detail("move_finished", folders=len(created))
     return created
 
 
-def commit_flatten_moves(root: Path | str, replacing: Collection[Path], plan: PlacementPlan | None = None) -> int:
-    """Move event-folder files back. Sources in ``replacing`` overwrite."""
+def commit_flatten_moves(
+    root: Path | str,
+    replacing: Collection[Path],
+    plan: PlacementPlan | None = None,
+    *,
+    delete_skipped: bool = False,
+) -> int:
+    """Move event-folder files back. Sources in ``replacing`` overwrite.
+
+    ``delete_skipped`` removes a file that stays behind because its name is
+    already in the storage folder and the user did not choose replace.
+    """
 
     filing = _filing()
     directory = _directory(root)
@@ -114,8 +142,9 @@ def commit_flatten_moves(root: Path | str, replacing: Collection[Path], plan: Pl
     allowed = _resolved(replacing)
     claimed: set[Path] = set()
     moved = 0
+    expect(len(plan.moves) + len(plan.clashes))
     for item in (*plan.moves, *plan.clashes):
-        if _place(item.source, item.target, allowed, claimed):
+        if _place(item.source, item.target, allowed, claimed, delete_skipped=delete_skipped):
             moved += 1
     folders = [
         entry
@@ -144,12 +173,16 @@ def _flatten_plan(root: Path | str) -> tuple[tuple[str, ...], PlacementPlan]:
     moves: list[PlannedMove] = []
     clashes: list[PlannedMove] = []
     claimed: set[Path] = set()
-    for folder in folders:
-        for entry in folder.iterdir():
-            if not entry.is_file():
-                continue
-            target = directory / filing._single_component(entry.name)
-            _classify(entry, target, moves, clashes, claimed)
+    pending = [
+        entry
+        for folder in folders
+        for entry in folder.iterdir()
+        if entry.is_file()
+    ]
+    expect(len(pending))
+    for entry in pending:
+        target = directory / filing._single_component(entry.name)
+        _classify(entry, target, moves, clashes, claimed)
     detail("flatten_planned", files=len(moves), clashes=len(clashes), folders=len(folders))
     names = tuple(folder.name for folder in folders)
     return names, PlacementPlan(tuple(moves), tuple(clashes))
@@ -163,6 +196,7 @@ def _directory(root: Path | str) -> Path:
 
 
 def _classify(source: Path, target: Path, moves: list[PlannedMove], clashes: list[PlannedMove], claimed: set[Path]) -> None:
+    tick()
     filing = _filing()
     if filing._same_file(source, target):
         detail("file_already_placed", path=str(target))
@@ -175,18 +209,34 @@ def _classify(source: Path, target: Path, moves: list[PlannedMove], clashes: lis
     claimed.add(target)
 
 
-def _place(source: Path, target: Path, allowed: set[Path], claimed: set[Path]) -> bool:
-    """Move ``source`` to ``target``. Return whether a file changed place."""
+def _place(
+    source: Path,
+    target: Path,
+    allowed: set[Path],
+    claimed: set[Path],
+    *,
+    copying: bool = False,
+    delete_skipped: bool = False,
+) -> bool:
+    """Move or copy ``source`` to ``target``. Return whether the destination changed."""
 
+    tick()
     filing = _filing()
     if filing._same_file(source, target):
         detail("file_already_placed", path=str(target))
         return False
     taken = target.exists() or target in claimed
     if taken and source.resolve() not in allowed:
-        detail("file_skipped", source=str(source), target=str(target))
+        if delete_skipped and source.is_file():
+            source.unlink()
+            detail("file_deleted", source=str(source), target=str(target))
+        else:
+            detail("file_skipped", source=str(source), target=str(target))
         return False
-    if taken:
+    if copying:
+        _copy_over(source, target)
+        detail("file_copied", source=str(source), target=str(target))
+    elif taken:
         _overwrite(source, target)
         detail("file_replaced", source=str(source), target=str(target))
     else:
@@ -194,6 +244,14 @@ def _place(source: Path, target: Path, allowed: set[Path], claimed: set[Path]) -
         detail("file_moved", source=str(source), target=str(target))
     claimed.add(target)
     return True
+
+
+def _copy_over(source: Path, target: Path) -> None:
+    """Put ``source`` at ``target`` and leave ``source`` where it is."""
+
+    if target.is_file():
+        target.unlink()
+    shutil.copy2(str(source), str(target))
 
 
 def _overwrite(source: Path, target: Path) -> None:

@@ -91,14 +91,18 @@ def move_into_cluster_folders(
     clusters: list[NamedCluster] | tuple[NamedCluster, ...],
     replacing: Collection[Path] | None = None,
     source: Path | str | None = None,
+    *,
+    copying: bool = False,
+    delete_skipped: bool = False,
 ) -> list[Path]:
-    """Create one folder per cluster under ``root`` and move its files in.
+    """Create one folder per cluster under ``root`` and move or copy its files in.
 
     Names must be a single path component. When ``replacing`` is omitted, a
     destination that already has the filename is left untouched and reported
     as ``FileExistsError`` before anything is moved. When ``replacing`` is
-    given, those source paths overwrite the destination and every other
-    clash is left where it is.
+    given, those source paths overwrite the destination. Every other clash
+    stays where it is, unless ``delete_skipped`` removes that source file.
+    ``copying`` leaves the source file in place and writes a copy.
     """
 
     from filenamecluster.core.operations.placement import (
@@ -114,13 +118,22 @@ def move_into_cluster_folders(
             detail("move_blocked", source=str(clash.source), target=str(clash.target))
             raise FileExistsError(clash.target)
         replacing = ()
-    return commit_cluster_moves(root, clusters, replacing, source)
+    return commit_cluster_moves(
+        root,
+        clusters,
+        replacing,
+        source,
+        copying=copying,
+        delete_skipped=delete_skipped,
+    )
 
 
 def flatten_cluster_folders(
     root: Path | str,
     replacing: Collection[Path] | None = None,
     plan=None,
+    *,
+    delete_skipped: bool = False,
 ) -> int:
     """Move files out of event folders back into ``root`` and remove those folders.
 
@@ -128,7 +141,8 @@ def flatten_cluster_folders(
     Other folders stay. When ``replacing`` is omitted, a name that already
     exists in ``root`` is reported as ``FileExistsError`` and nothing is
     moved. When ``replacing`` is given, those source paths overwrite and
-    every other clash stays in its event folder. Returns how many files moved.
+    every other clash stays in its event folder, unless ``delete_skipped``
+    removes that file. Returns how many files moved.
     """
 
     from filenamecluster.core.operations.placement import commit_flatten_moves
@@ -140,7 +154,7 @@ def flatten_cluster_folders(
             detail("flatten_blocked", source=str(clash.source), target=str(clash.target))
             raise FileExistsError(clash.target)
         replacing = ()
-    return commit_flatten_moves(root, replacing, plan)
+    return commit_flatten_moves(root, replacing, plan, delete_skipped=delete_skipped)
 
 
 def is_folder(path: Path | str) -> bool:

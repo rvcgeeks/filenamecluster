@@ -56,7 +56,7 @@ def make_root() -> tk.Tk:
 
 
 def run_inline(_message_key, work, on_done) -> None:
-    """Run disk work on this thread. Window tests pass this instead of the spinner."""
+    """Run disk work on this thread. Window tests pass this instead of the progress bar."""
 
     try:
         outcome = work()
